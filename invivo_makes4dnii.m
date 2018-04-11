@@ -1,0 +1,79 @@
+%make fsl volumes
+
+pathinteract='Users/alex/brain_data/motor/25october2016/regimages/'; % '/glusterspace/motor/exvivojac/'
+fslpath='/Applications/fsl//bin/'; %'/cm/shared/apps/fsl/bin/';
+ants_path='/Users/alex/AlexBadea_MyScripts/ANTs082016/'; %'/cm/shared/apps/ANTS/';
+pathin='/Users/alex/brain_data/motor/25october2016/livejac/'; %MDT_images/'; % '/glusterspace/VBM_14obrien01_DTI101b_clean-work/dwi/fa/faMDT_Control_n12/reg_images/';
+pathsmooth='/Users/alex/brain_data/motor/25october2016/livejac_s1/'; % '/glusterspace/motor/smoothed/';
+path_smooth=pathsmooth; %'/glusterspace/motor/smoothed/';
+invivopath_in=path_smooth;
+invivopath_out='/Users/alex/brain_data/motor/25october2016/4dnii_s1/' ; % '/glusterspace/motor/exvivo_fa/';
+mysmooth=1;
+suffix='jac'
+prefix='Tlive_'
+
+myfiles=dir(fullfile(pathin, '*.nii.gz'));
+
+%if smoothing not done
+if mysmooth==1
+for i=1:numel(myfiles)
+    
+runno=myfiles(i).name;
+filein=[pathin runno];
+filesmooth=[pathsmooth runno]
+
+ants_smth=[ants_path 'SmoothImage 3 ' filein '  1 ' filesmooth ' 0 '];
+system(ants_smth, '-echo'); 
+end
+end
+
+
+reacher_files={[pathsmooth 'TRS1_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRS2_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRS3_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRS5_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRS6_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRU2_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRU3_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRU5_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRW3_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRW5_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRW7_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TRW8_' suffix '_to_MDT.nii.gz']};
+
+
+control_files={
+[pathsmooth 'TCS4_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth  'TCS7_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth  'TCS8_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth  'TCS9_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth  'TCS10_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCS11_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCU1_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCU7_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCW1_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCW4_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCW6_' suffix '_to_MDT.nii.gz'],...
+[pathsmooth 'TCW9_' suffix '_to_MDT.nii.gz']};
+
+allinvivo=[reacher_files control_files]
+
+spaghetti_string=' ';
+
+for i=1:24 spaghetti_string =[spaghetti_string allinvivo{i} ' ']
+end
+
+%sMDT_mask_e3.nii
+
+fslcmd1=[fslpath '/fslmerge -a ' invivopath_out prefix suffix '4d.nii.gz ' spaghetti_string]
+system(fslcmd1, '-echo'); 
+
+mymask='/glusterspace/motor/median_images/MDT_mask_e3.nii'
+fslcmd2=[fslpath '/randomise -i '  invivopath_out suffix '4d.nii.gz  -o ' invivopath_out suffix '_' ' -m ' mymask  ... 
+    ' -d  ' invivopath_out 'jac.mat  -t ' invivopath_out 'jac.con -x -R -T -P -v 0.2 -C 1.71 -n 5000 --tfce_E=0.8  --uncorrp'];
+%-x -R -T -P -v 0.2 -C 100 -n 5000 --tfce_E=0.8  --glm_output'
+%--uncorrp
+fslcmd3=[fslpath '/cm/shared/apps/fsl/bin/randomise -i '  invivopath_out suffix '4d.nii.gz ' ' -o ' invivopath_out suffix '_' ' -m ' mymask  ... 
+    ' -d  ' invivopath_out 'jac.mat  -t ' invivopath_out 'jac.con -x -R -T -P -C 1.71 -n 5000 --tfce_E=0.8  --guncorrp'];
+
+%system(fslcmd2, '-echo'); 
