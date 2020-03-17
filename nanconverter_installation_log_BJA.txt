@@ -1,0 +1,168 @@
+Installing nanconverter on kefalonia
+
+16 January 2020 (Thursday)
+
+# Starting point:
+# https://github.com/spinicist/nanconvert
+
+# First need to install/compi.e ITK version 4.13 -- not sure what to make when it says that it should be the development version, as that is a note from 2017
+
+# Let's track down ITK and install...
+# https://itk.org/download/
+# Don't see a software package explicitly labeled "development", so downloading 4.13.2 and seeing if there is a development flag upon installation:
+
+# Downloaded file: InsightToolkit-4.13.2.tar.gz
+
+# The link to the ITK Software Guide was broken, but found what I think is the right document at: https://sourceforge.net/projects/itk/files/itk/4.13/.
+# Downloaded file: InsightSoftwareGuide-Book1-4.13.0.pdf
+
+# It looks like we need cmake, as it is not on this system yet...
+# https://cmake.org/download/
+
+# Downloaded file: cmake-3.16.2.tar.gz
+
+# Looking for instructions in: https://cmake.org/install/
+
+# Going to try the bootstrap script to install:
+
+cd /Users/alex/Downloads/cmake-3.16.2
+./bootstrap
+make
+make install
+
+# That last command failed, most likely due to permission errors, trying with sudo
+sudo make install
+
+# SUCCESS!  Moving on?
+
+# Need to decide where to install the source directory and the binary directory...is there a pre-determined answer to this? Or do I need to waste bandwidth on this?
+
+# Per Lucy's suggestion, putting binary in /Applications
+cd /Applications/
+
+# Now running commands directly from page 12 of the guide:
+mkdir ITK-build
+cd ITK-build
+
+# Except that we're just keeping the source in Downloads for now...
+ccmake ~/Downloads/cmake-3.16.2
+
+# We now have a terminal dialog...not sure if the default is what we want or not...
+# I'm getting an error from Java about needing to install JDK to use via the commandline...I clicked the More Info button, which took me to a window to download and install. (https://www.java.com/en/download/mac_download.jsp)
+
+# Which shows the following:
+## Download Java for Mac OS X
+## Recommended Version 8 Update 241 (filesize: 80.25 MB)
+## Release date January 14, 2020 
+
+# Looks like this downloaded jre-8u241-macosx-x64.dmg...installing that now...Seems to be successful?
+
+# Changing CMAKE_BUILD_TYPE from (not specified) to Release (hope this isn't an unforced error!)
+# Still getting java error
+
+# Actually may be a non-issue for now...I think I was supposed "generate" (g) instead of "configure" (c)...the latter gave me an error while the former did not.
+# ACTUALLY, I have to "configure" before "generate" is even an option, so, who knows?
+# I'm supposed to be able to simply run 'make', but apparently the correct file was not generated, cause I just get a dumb error instead.
+
+# Per advice at: https://www.theitsage.com/fix-java-command-line-tool-popup-mac/
+# Downloaded Java legacy support at:
+# https://support.apple.com/kb/dl1572
+# After installing, restarted computer...
+# Trying again:
+ccmake ~/Downloads/cmake-3.16.2
+
+# Build type = release seems to still be selected...hit (c) to configure...NO JAVA ERROR!  HURRAY!
+
+# I had to (c) twice before I was able to (g)...but still no build files are being generated.
+# Tried it again, and only had to (c) once before (g) option appeared...still no files are being produced though!
+
+# James recommended using homebrew
+# After installing that...
+
+# https://blog.kitware.com/kitware-packages-on-os-x-with-homebrew/
+
+# This appears to be OUTDATED. Sonofabitch
+
+# Though 'man brew' shows me that '--devel' is an option to install the development version. Is this what the github install instructions were talking about?
+
+# Having a hard time finding how to install a specific version, so, per James' advice, just going to go with current version until shit breaks.
+
+ brew install insighttoolkit
+
+# Seemed to run successfully
+
+# Try to install nanconvert
+cd /Applications
+git clone --recursive https://github.com/spinicist/nanconvert.git;
+cd nanconvert;
+git submodule init; git submodule update;
+mkdir -m 775 nanconvert-build;
+cd nanconvert-build;
+ccmake /Applications/nanconvert;
+
+
+# It says I have the wrong ITK!!!
+
+# Uninstalling and re-installing
+# Also, try to find ITK validation data...
+
+# FINALLY realized that the installation instructions were WRONG. The issue is that nanconvert is finding ITK v4.13 BUT only will work with v5.0.0! A$$holes!
+
+------------
+17 January 2020 (Friday)
+
+# From:https://itk.org/download/
+# Downloaded file: InsightToolkit-5.0.1.tar.gz
+
+cd /Applications/ITK-build;
+ccmake /Users/alex/Downloads/InsightToolkit-5.0.1;
+make;
+make install;
+
+# SUCCESS!
+
+# Now let's try nanconvert again:
+cd /Applications/nanconvert-build;
+ccmake ../nanconvert;
+
+# Manually updated ITK path to: /Applications/ITK-build
+
+make;
+make install;
+
+# SUCCESS!
+# Now let's see how we use this bad boy...
+
+# Test data in: /Users/alex/mouseprojects/pCASL
+
+cd ~/mouseprojects/pCASL/test_niis/;
+
+bruker_folder=~/mouseprojects/pCASL/20190606_142204_060719_1_1_1/;
+nanbruker -z ${bruker_folder};
+
+# Seems to be successful! Out put in ~/mouseprojects/pCASL/test_niis/:
+13_1_pCASL_EPI_PhSw7_pCASL_EPI_PhSw7label_no1.nii.gz
+15_1_B0MapADJ_B0MAP_pCASL_EPI_PhSw7label_no1.nii.gz
+17_1_pCASL_EPI_PhSw7_pCASL_EPI_PhSw7label_no1.nii.gz
+
+
+#### Installing latest version of ANTs now...
+# From: https://github.com/cookpa/antsInstallExample
+# Downloaded file: installANTs.sh
+
+mkdir -m 775 /Applications/ANTs
+cd /Applications/ANTs
+chmod 775 /Users/alex/Downloads/installANTs.sh
+/Users/alex/Downloads/installANTs.sh
+
+cd /Applications/ANTs/build/ANTS-build;
+make install 2>&1 | tee install.log;
+ANTSPATH=/Applications/ANTs/install/bin/;
+export PATH=${ANTSPATH}:$PATH;
+
+# TESTING:
+kefalonia:ANTS-build alex$ which antsRegistration
+/Applications/ANTs/install/bin//antsRegistration
+
+# Smells like success to me!
+
