@@ -1,6 +1,20 @@
 #!/bin/bash
+
+## RJA, Badea Lab, 22 April 2020
+# This function uses antsRegistration from the ANTs toolbox to affinely register all images in a 4D nifti stack to the first volume.
+# In the '-work' folder are the individual images after the calculated transforms have been applied to the corresponding input image.
+# These images are then reconcatonated into a registered 4D nift stack and placed in the '-results' folder. 
+# Also in the '-results' folder are the individual transforms for each volume.
+# Currently these transforms are NOT being applied to any DWI b-vector table.
+
+# Though it doesn't belong here on a long-term basis, some minimal DWI processing has been included here.
+# Right now, this will extract the b-table from a .bxh header, if there is one immediately next to the 4D nifti stack, and has the same name, save for the extension (.bxh instead of .nii or .nii.gz)
+
+# There is hope that it will also spit out the dwi image contrast while it's at it...but that's a WIP.
+
 nii4D=$1;
-dti=$2
+identifier=$2
+dti=$3
 
 if [[ ! -f ${nii4D} ]];then
     nii4D=${PWD}/${nii4D};
@@ -12,8 +26,15 @@ ext="nii.gz";
 
 
 sbatch_file='';
-base=${nii4D##*/};
-runno=$(echo $base | cut -d '.' -f1);
+
+
+if [[ "x${identifier}x" == "xx" ]];then
+    base=${nii4D##*/};
+    runno=$(echo $base | cut -d '.' -f1);
+else
+    runno=$identifier;
+fi
+
 echo "Processing runno: ${runno}";
 
 YYY=$(PrintHeader $nii4D 2 | cut -d 'x' -f4);
@@ -60,7 +81,7 @@ if [[ ! -d ${sbatch_folder} ]];then
 fi
 
 if [[ ! -d ${results} ]];then
-    mkdir -p -m 775 $results};
+    mkdir -p -m 775 $results;
 fi
 
 prefix="${BIGGUS_DISKUS}/${job_desc}_${runno}_m${zeros}-inputs/${runno}_m.nii.gz";
@@ -182,18 +203,20 @@ if [[ "x${dti}x" == "x1x" ]];then
     bvecs=${bvecs/${job_shorthand}_/};
     bvals=${bvecs/bvecs/bvals};
 
-    dsi_bvecs=${bvecs/fsl/dsi};
-    dsi_bvals=${bvals/fsl/dsi};
+    dsi_btable=${bvecs/fsl/dsi};
+    dsi_btable=${dsi_btable/bvecs/btable};
 
     if [[ ! -f ${bvecs} ]];then
 	bxh=${nii4D/${ext}/bxh};
 	bvec_cmd="extractdiffdirs --fsl ${bxh} ${bvecs} ${bvals}";
-	dsi_bvec_cmd="extractdiffdirs --dsistudio ${bxh} ${dsi_bvecs} ${dsi_bvals}";
+	dsi_bvec_cmd="extractdiffdirs --dsistudio ${bxh} ${dsi_btable}";
 	echo $bvec_cmd;
 	$bvec_cmd;
 
 	echo $dsi_bvec_cmd;
 	$dsi_bvec_cmd;
     fi
+
+    
 
 fi
