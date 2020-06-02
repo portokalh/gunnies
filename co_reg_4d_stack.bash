@@ -37,13 +37,17 @@ fi
 
 echo "Processing runno: ${runno}";
 
+if [[ ! -f $nii4D ]];then    
+    echo "ABORTING: Input file does not exist: ${nii4D}" && exit 1;
+fi
+
 YYY=$(PrintHeader $nii4D 2 | cut -d 'x' -f4);
 XXX=$(expr $YYY - 1);
 
 declare -i XXX; # Need to 
 
 echo "Total number of volumes: $YYY";
-echo "Number of unregistered volumes: $XXX";
+echo "Number of independently oriented volumes: $XXX";
 
 if [[ $XXX -lt 10 ]];then
     zeros='0';
@@ -85,6 +89,8 @@ if [[ ! -d ${results} ]];then
 fi
 
 prefix="${BIGGUS_DISKUS}/${job_desc}_${runno}_m${zeros}-inputs/${runno}_m.nii.gz";
+
+## To-do (2 June 2020 Tues): Make this a cluster job; use for later jobs: echo "#\$ -hold_jid ${jid_list}" >> ${sbatch_file};
 
 if [[ ! -e ${vol_zero} ]];then
     if [[ ! -e ${prefix/_m/_m1000} ]];then
@@ -137,8 +143,8 @@ for nn in $(eval echo "{${zero_pad}1..$XXX}");do
 	    echo "#\$ -l h_vmem=8000M,vf=8000M" >> ${sbatch_file};
 	    echo "#\$ -M ${USER}@duke.edu" >> ${sbatch_file};
 	    echo "#\$ -m ea" >> ${sbatch_file}; 
-	    echo "#\$ -o ${sbatch_folder}/slurm-$JOB_ID.out" >> ${sbatch_file};
-	    echo "#\$ -e ${sbatch_folder}/slurm-$JOB_ID.out" >> ${sbatch_file};
+	    echo "#\$ -o ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
+	    echo "#\$ -e ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
 	    echo "#\$ -N ${name}" >> ${sbatch_file};
 
 	    reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${vol_zero},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
@@ -161,15 +167,17 @@ for nn in $(eval echo "{${zero_pad}1..$XXX}");do
 
 	    mv ${sbatch_file} ${new_sbatch_file};
 
-	    jid_list="${jid_list},${job_id}";
+	    jid_list="${jid_list}${job_id},";
 	fi
 done
 
+#Trim trailing comma from job id list:
+jid_list=${jid_list%,};
 
 reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ext}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
-     if [[ ! -f ${reg_nii4D} ]];then
+if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
     sbatch_file="${sbatch_folder}/${name}.bash";
     
@@ -178,17 +186,19 @@ assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reas
     echo "#\$ -l h_vmem=32000M,vf=32000M" >> ${sbatch_file};
     echo "#\$ -M ${USER}@duke.edu" >> ${sbatch_file};
     echo "#\$ -m ea" >> ${sbatch_file}; 
-    echo "#\$ -o ${sbatch_folder}/slurm-$JOB_ID.out" >> ${sbatch_file};
-    echo "#\$ -e ${sbatch_folder}/slurm-$JOB_ID.out" >> ${sbatch_file};
+    echo "#\$ -o ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
+    echo "#\$ -e ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
     echo "#\$ -N ${name}" >> ${sbatch_file};
     if [[ "x${jid_list}x" != "xx" ]];then
 	echo "#\$ -hold_jid ${jid_list}" >> ${sbatch_file};
     fi
     echo "${assemble_cmd}" >> ${sbatch_file};
 
-    echo $assemble_cmd;
+    ass_cmd="qsub -terse -V ${sbatch_file}";
+    
+    echo $ass_cmd;
 
-    job_id=$($assemble_cmd | tail -1);
+    job_id=$($ass_cmd | tail -1);
 
     echo "JOB ID = ${job_id}; Job Name = ${name}";
 
