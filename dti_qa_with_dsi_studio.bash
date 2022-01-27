@@ -1,5 +1,11 @@
 #! /bin/bash
 echo "Attempting to run DTI QA with DSI Studio (via command line, nonetheless!)"
+
+# This is the newly compiled dsistudio...we are just testing it for now
+source /etc/profile.d/modules.sh;
+module load dsistudio/20180906;
+
+
 nii4D=$1;
 btable=$2; # This can also be a bvec OR a bval file, but the unspecified one needs have an otherwise identical path.
 c_mask=$3;
@@ -66,24 +72,24 @@ if [[ ! -f "${fa_file}" ]];then
 	c_cmd="dsi_studio --action=rec --source=${out_src} --method=1 --output_dif=0 --thread_count=32 --mask=${c_mask} --check_btable=0";
 
 	if [[ ! -f "${out_src}" ]];then
-	    src_cmd="dsi_studio --action=src --source=${nii4D}  --b_table=${btable}  --output=${out_src}";
+	    src_cmd="dsi_studio --action=src --source=${nii4D}  ${b_string} --output=${out_src}";
 	fi
     fi
 fi
 
 
 
-if [[ ! -f "${fib_file}" ]] && [[ -f "${fa_file}" ]] && [[ ! ${cleanup} ]];then
+if [[ ! -f "${fib_file}" ]] && [[ -f "${fa_file}" ]] && (( ! ${cleanup} ));then
     c_cmd="dsi_studio --action=rec --source=${out_src} --method=1 --output_dif=0 --thread_count=32 --mask=${c_mask} --check_btable=0";
 
     if [[ ! -f "${out_src}" ]];then
-	src_cmd="dsi_studio --action=src --source=${nii4D}  --b_table=${btable}  --output=${out_src}";
+	src_cmd="dsi_studio --action=src --source=${nii4D}  ${b_string} --output=${out_src}";
     fi
 
 fi
 
-if [[ ! -f "${out_src}" ]] && [[ ! ${cleanup} ]];then
-    src_cmd="dsi_studio --action=src --source=${nii4D}  --b_table=${btable}  --output=${out_src}";
+if [[ ! -f "${out_src}" ]] && (( ! ${cleanup} ));then
+    src_cmd="dsi_studio --action=src --source=${nii4D} ${b_string}  --output=${out_src}";
 fi
 
 
@@ -93,7 +99,8 @@ $c_cmd;
 $exp_cmd;
 $t_cmd;
 
-if [[ -f $fa_file ]] && [[ -f $stat_file ]] && [[ $cleanup ]];then
+
+if [[ -f $fa_file ]] && [[ -f $stat_file ]] && (( $cleanup ));then
 
     if [[ -f $out_src ]] || [[ -f $fib_file ]] || [[ -f $out_trk ]];then
 	echo "Cleaning up large DSI Studio files:";

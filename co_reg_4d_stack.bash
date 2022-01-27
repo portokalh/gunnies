@@ -12,9 +12,16 @@
 
 # There is hope that it will also spit out the dwi image contrast while it's at it...but that's a WIP.
 
+## RJA, 30 December 2021
+# All volumes can be registered to an arbitrary image now. Instead of the passing a "dti" flag as the third option, that option is now the full path to the that target. ("dti" is set to zero)
+
+## RJA, 11 January 2022
+# Need to test for ability to run ANTs PrintHeader command, and set switch to later run it on a regular blade/node:
+PH_test=$(PrintHeader 2>/dev/null | grep Usage | wc -l);
+
 nii4D=$1;
-identifier=$2
-dti=$3
+identifier=$2;
+dti=$3;
 
 if [[ ! -f ${nii4D} ]];then
     nii4D=${PWD}/${nii4D};
@@ -27,7 +34,6 @@ ext="nii.gz";
 
 sbatch_file='';
 
-
 if [[ "x${identifier}x" == "xx" ]];then
     base=${nii4D##*/};
     runno=$(echo $base | cut -d '.' -f1);
@@ -35,19 +41,40 @@ else
     runno=$identifier;
 fi
 
+reg_to_vol_zero=1;
+target_vol='';
+if [[ -f ${dti} ]];then
+    echo "Registering to: $dti.";
+    target_vol=$dti;
+    reg_to_vol_zero=0;
+    dti=0;
+fi
+
+
 echo "Processing runno: ${runno}";
 
 if [[ ! -f $nii4D ]];then    
     echo "ABORTING: Input file does not exist: ${nii4D}" && exit 1;
 fi
 
-YYY=$(PrintHeader $nii4D 2 | cut -d 'x' -f4);
+YYY_cmd="PrintHeader $nii4D 2 | cut -d 'x' -f4";
+# I can't believe I'm about to do something so fucking retarded as this...
+if ((${PH_test}));then
+    YYY=$(${YYY_cmd});
+else
+    YYY=$(ssh blade16 ${YYY_cmd} );
+fi
+
 XXX=$(expr $YYY - 1);
 
-declare -i XXX; # Need to 
+declare -i XXX;
 
 echo "Total number of volumes: $YYY";
-echo "Number of independently oriented volumes: $XXX";
+if ((${reg_to_vol_zero}));then
+    echo "Number of independently oriented volumes: $XXX";
+else
+    echo "Number of independently oriented volumes: $YYY";
+fi
 
 if [[ $XXX -lt 10 ]];then
     zeros='0';
@@ -67,9 +94,6 @@ work="${BIGGUS_DISKUS}/${job_desc}_${runno}_m${zeros}-work/";
 results="${BIGGUS_DISKUS}/${job_desc}_${runno}_m${zeros}-results/";
 
 vol_zero="${inputs}${runno}_m${zeros}.${ext}";
-
-echo "Target for coregistration: ${vol_zero}";
-
 
 if [[ ! -d ${inputs} ]];then
     mkdir -p -m 775 ${inputs};
@@ -112,16 +136,24 @@ jid_list='';
 
 
 #for nn in $(seq 1 $XXX);do
-
-if [[ ! -e ${work_vol_zero} ]];then
-    ln -s ${vol_zero} ${work_vol_zero};
+if (( ! ${reg_to_vol_zero}));then
+    start_vol=0;
+else
+    start_vol=1;
+    target_vol=${vol_zero};
+    if [[ ! -e ${work_vol_zero} ]];then
+	ln -s ${vol_zero} ${work_vol_zero};
+    fi
 fi
+
+echo "Target for coregistration: ${target_vol}";
+
 echo "Dispatching co-registration jobs to the cluster:";
 
 # Note the following line is necessarily complicated, as...
 # the common sense line ('for nn in {01..$XXX}') does not work...
 # https://stackoverflow.com/questions/169511/how-do-i-iterate-over-a-range-of-numbers-defined-by-variables-in-bash
-for nn in $(eval echo "{${zero_pad}1..$XXX}");do
+for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
     # num_string=$nn;
     # if [[ $nn -lt 10 ]];then
     # num_string="0${nn}";
@@ -147,7 +179,7 @@ for nn in $(eval echo "{${zero_pad}1..$XXX}");do
 	    echo "#\$ -e ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
 	    echo "#\$ -N ${name}" >> ${sbatch_file};
 
-	    reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${vol_zero},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
+	    reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
 	    apply_cmd="if [[ ! -e ${vol_xxx_out} ]];then ${ANTSPATH}/antsApplyTransforms -d 3 -e 0 -i ${vol_xxx} -r ${vol_zero} -o ${vol_xxx_out} -n Linear -t ${xform_xxx}  -v 0 --float;fi";
 
 	    echo "${reg_cmd}" >> ${sbatch_file};
@@ -155,15 +187,21 @@ for nn in $(eval echo "{${zero_pad}1..$XXX}");do
 
 	    
 	    # cmd="qsub -terse  -b y -V ${sbatch_file}";
-	    cmd="qsub -terse -V ${sbatch_file}";
+	    #cmd="qsub -terse -V ${sbatch_file}";
 	    
+	    #NEED TO SWITCH TO OUR SUBMIT SGE CLUSTER....much less code to look at.
+	    #cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${job_name} 0 0 ${cmd}";
 	    echo $cmd;
 
 	    job_id=$($cmd | tail -1);
 
 	    echo "JOB ID = ${job_id}; Job Name = ${name}";
-
-	    new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
+	    
+	   new_sbatch_file="${sbatch_folder}/${job_id}_${name}.bash";
+	   # The following code breaks down when we don't register to the first volume,
+	   # as then name will look like "${runno}_m00", which will also appear in the *-inputs/work/results
+	   # directories. Then it will try to sub in the first occurrence--the folder name--which doesn't exist.
+	   #new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
 
 	    mv ${sbatch_file} ${new_sbatch_file};
 
@@ -202,7 +240,7 @@ if [[ ! -f ${reg_nii4D} ]];then
 
     echo "JOB ID = ${job_id}; Job Name = ${name}";
 
-    new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
+    new_sbatch_file="${sbatch_folder}/${job_id}_${name}.bash";
 
     mv ${sbatch_file} ${new_sbatch_file};
 
