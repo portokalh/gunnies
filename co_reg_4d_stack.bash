@@ -57,13 +57,16 @@ if [[ ! -f $nii4D ]];then
     echo "ABORTING: Input file does not exist: ${nii4D}" && exit 1;
 fi
 
-YYY_cmd="PrintHeader $nii4D 2 | cut -d 'x' -f4";
+#YYY_cmd="PrintHeader $nii4D 2 | cut -d 'x' -f4";
+YYY_cmd="PrintHeader $nii4D 2"; # Piping stdout seems to not work when running...agnostically(?)
 # I can't believe I'm about to do something so fucking retarded as this...
 if ((${PH_test}));then
-    YYY=$(${YYY_cmd});
+    PH_result=$(${YYY_cmd});
 else
-    YYY=$(ssh blade16 ${YYY_cmd} );
+    PH_result=$(ssh blade16 ${YYY_cmd} );
 fi
+
+YYY=$(echo ${PH_result} |  cut -d 'x' -f4 );
 
 XXX=$(expr $YYY - 1);
 
@@ -171,41 +174,23 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	#cp ${source_sbatch} ${sbatch_file};
 	if [[ ! -e ${xform_xxx} ]] ||  [[ ! -e ${vol_xxx_out} ]];then
 
-	    echo "#!/bin/bash" > ${sbatch_file};
-	    echo "#\$ -l h_vmem=8000M,vf=8000M" >> ${sbatch_file};
-	    echo "#\$ -M ${USER}@duke.edu" >> ${sbatch_file};
-	    echo "#\$ -m ea" >> ${sbatch_file}; 
-	    echo "#\$ -o ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
-	    echo "#\$ -e ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
-	    echo "#\$ -N ${name}" >> ${sbatch_file};
 
-	    reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
+	    bj_temp_test=1;
+	    if ((${bj_temp_test}));then
+		reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-7,15 ] -s 2x1x0.5vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
+	    else	
+		reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
+	    fi
 	    apply_cmd="if [[ ! -e ${vol_xxx_out} ]];then ${ANTSPATH}/antsApplyTransforms -d 3 -e 0 -i ${vol_xxx} -r ${vol_zero} -o ${vol_xxx_out} -n Linear -t ${xform_xxx}  -v 0 --float;fi";
-
-	    echo "${reg_cmd}" >> ${sbatch_file};
-	    echo "${apply_cmd}" >> ${sbatch_file};
-
-	    
-	    # cmd="qsub -terse  -b y -V ${sbatch_file}";
-	    #cmd="qsub -terse -V ${sbatch_file}";
-	    
-	    #NEED TO SWITCH TO OUR SUBMIT SGE CLUSTER....much less code to look at.
-	    #cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${job_name} 0 0 ${cmd}";
-	    echo $cmd;
-
-	    job_id=$($cmd | tail -1);
-
-	    echo "JOB ID = ${job_id}; Job Name = ${name}";
-	    
-	   new_sbatch_file="${sbatch_folder}/${job_id}_${name}.bash";
-	   # The following code breaks down when we don't register to the first volume,
-	   # as then name will look like "${runno}_m00", which will also appear in the *-inputs/work/results
-	   # directories. Then it will try to sub in the first occurrence--the folder name--which doesn't exist.
-	   #new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
-
-	    mv ${sbatch_file} ${new_sbatch_file};
-
-	    jid_list="${jid_list}${job_id},";
+	   
+	    final_cmd="${reg_cmd};${apply_cmd}";	
+	    sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${name} 0 0 ${final_cmd}";
+	    # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
+	    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+	    if ((! $?));then
+		jid_list="${jid_list}${job_id},";
+	    fi	    
+	   
 	fi
 done
 
@@ -217,32 +202,10 @@ assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reas
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
 if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
-    sbatch_file="${sbatch_folder}/${name}.bash";
-    
-
-    echo "#!/bin/bash" > ${sbatch_file};
-    echo "#\$ -l h_vmem=32000M,vf=32000M" >> ${sbatch_file};
-    echo "#\$ -M ${USER}@duke.edu" >> ${sbatch_file};
-    echo "#\$ -m ea" >> ${sbatch_file}; 
-    echo "#\$ -o ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
-    echo "#\$ -e ${sbatch_folder}"'/slurm-$JOB_ID.out' >> ${sbatch_file};
-    echo "#\$ -N ${name}" >> ${sbatch_file};
-    if [[ "x${jid_list}x" != "xx" ]];then
-	echo "#\$ -hold_jid ${jid_list}" >> ${sbatch_file};
-    fi
-    echo "${assemble_cmd}" >> ${sbatch_file};
-
-    ass_cmd="qsub -terse -V ${sbatch_file}";
-    
-    echo $ass_cmd;
-
-    job_id=$($ass_cmd | tail -1);
-
+    sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
+    echo ${sub_cmd};
+    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
     echo "JOB ID = ${job_id}; Job Name = ${name}";
-
-    new_sbatch_file="${sbatch_folder}/${job_id}_${name}.bash";
-
-    mv ${sbatch_file} ${new_sbatch_file};
 
 fi 
 

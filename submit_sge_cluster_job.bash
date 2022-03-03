@@ -66,7 +66,11 @@ job_id=$($sub_cmd | tail -1);
 
 echo "JOB ID = ${job_id}; Job Name = ${name}";
 
-new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
+#new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
+new_sbatch_file="${sbatch_folder}/${job_id}_${name}.bash";
+# The first version of the "new_sbatch_file" code breaks down when we don't register to the first volume,
+# as then name will look like "${runno}_m00", which will also appear in the *-inputs/work/results
+# directories. Then it will try to sub in the first occurrence--the folder name--which doesn't exist.
 
 mv ${sbatch_file} ${new_sbatch_file};
 re='^[1-9]?[0-9]+$';
