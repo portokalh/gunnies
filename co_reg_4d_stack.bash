@@ -134,19 +134,20 @@ if [[ ! -e ${vol_zero} ]];then
 fi
 
 work_vol_zero="${work}/${job_shorthand}_${runno}_m${zeros}.${ext}";
-reassemble_list="${work_vol_zero} ";
 jid_list='';
 
 
 #for nn in $(seq 1 $XXX);do
 if (( ! ${reg_to_vol_zero}));then
     start_vol=0;
+    reassemble_list="";
 else
     start_vol=1;
     target_vol=${vol_zero};
     if [[ ! -e ${work_vol_zero} ]];then
 	ln -s ${vol_zero} ${work_vol_zero};
     fi
+    reassemble_list="${work_vol_zero} ";
 fi
 
 echo "Target for coregistration: ${target_vol}";
