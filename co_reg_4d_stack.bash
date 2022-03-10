@@ -196,7 +196,11 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 done
 
 #Trim trailing comma from job id list:
-jid_list=${jid_list%,};
+if (($jid_list}));then
+    jid_list=${jid_list%,};
+else
+    jid_list='0';
+fi
 
 reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ext}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
