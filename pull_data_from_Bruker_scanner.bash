@@ -30,6 +30,18 @@ T_machine=$3;
 T_location=$4;
 day=$5;
 
+# Archive option
+if [[ ${T_machine} == "archive" ]];then
+	T_machine=samos;
+	echo "You have selected the 'archive' option; raw Bruker data will be copied to the project folder ${T_location} if it exists in the database."
+	T_location=/mnt/paros_DB/Projects/${T_location}/Data/raw_bruker_data/;
+	echo "New target location: ${T_location}.";
+	echo "Please be sure that ${T_USER} exists on samos; if not, please consider running as user 'alex' instead."
+	archive_check_cmd="cd ${T_location/raw_bruker_data/}; if [[ ! -d ${T_location} ]];then mkdir -m 775 ${T_location};fi;exit";
+	echo "Enter the password for ${T_USER} on ${T_machine} if prompted...";
+	ssh -t ${T_USER}@samos ${archive_check_cmd};
+fi
+
 # Error checking:
 ping_test=$(ping -c 1 ${T_machine} 2> /dev/null | grep "transmitted, 1" | grep  "received" | wc -l | tr -d ' ');
 
@@ -39,8 +51,6 @@ if ((! ${ping_test}));then
 	errors=1;
 	error_message="${error_message}^Unable to connect to target machine, \"${T_machine}\"; please check to make sure you have entered the name correctly and the machine is on.";
 fi
-
-
 
 
 if ((${errors}));then
@@ -53,9 +63,9 @@ fi
 
 # Run your commands:
 
-remote_commands="cd /opt/PV6.0.1/data/${B_USER}/; echo \"Enter the password for ${T_USER} on ${T_machine} when prompted:\"; scp -r ${day}_* ${T_USER}@${T_machine}:${T_location};"
+remote_commands="cd /opt/PV6.0.1/data/${B_USER}/; echo \"Enter the password for ${T_USER} on ${T_machine} if prompted...\"; scp -r ${day}_* ${T_USER}@${T_machine}:${T_location};"
 
-echo "Enter the password for ${B_USER} on nemo when prompted."
+echo "Enter the password for ${B_USER} on nemo if prompted..."
 ssh -t ${B_USER}@nemo ${remote_commands};
 #echo "screen -d -m  ${remote_commands}" | ssh -t ${B_USER}@nemo;
 # Enter the appropriate password when prompted, of course.
