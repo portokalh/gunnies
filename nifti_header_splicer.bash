@@ -132,6 +132,9 @@ common_params=" if=${tmp_header} of=${data} conv=notrunc $stat"
 # Block 1: The first 40 bytes, no offset. Fields: sizeof_hdr to dim_info.
 dd $common_params skip=0 ibs=40 count=1 obs=40 seek=0;
 
+# Block 1.5: 6 bytes with 42 byte offset. Fields: dim[2:4].
+dd $common_params ibs=6 skip=7 count=1 obs=6 seek=7;
+
 # Block 2: 18 bytes with 74 byte offset. Fields: slice_start and the first 8 bytes of pix_dim.
 dd $common_params ibs=2 skip=37 count=9 obs=2 seek=37;
 
