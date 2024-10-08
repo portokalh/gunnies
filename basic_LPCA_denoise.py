@@ -2,8 +2,8 @@
 #$ -l h_vmem=50000M,vf=50000M
 #$ -M ${USER}@duke.edu 
 #$ -m ea 
-#$ -o /mnt/munin6/Badea/Lab/mouse/sinha_sbatch/slurm-$JOB_ID.out 
-#$ -e /mnt/munin6/Badea/Lab/mouse/sinha_sbatch/slurm-$JOB_ID.out
+#$ -o /mnt/munin2/Badea/Lab/mouse/sinha_sbatch/slurm-$JOB_ID.out 
+#$ -e /mnt/munin2/Badea/Lab/mouse/sinha_sbatch/slurm-$JOB_ID.out
 #$ -N ${1}_LPCA_denoising
 
 import os.path

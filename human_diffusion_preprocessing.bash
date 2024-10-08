@@ -5,7 +5,7 @@ proc_name="diffusion_prep"; # Not gonna call it diffusion_calc so we don't assum
 ## 15 June 2020, BJA: I still need to figure out the best way to pull out the non-zero bval(s) from the bval file.
 ## For now, hardcoding it to 1000 to run Whitson data. # 8 September 2020, BJA: changing to 800 for Sinha data.
 ## 24 January 2022, BJA: Changing bval to 2400 for Manisha's data.
-nominal_bval='2400';
+nominal_bval='2000';
 
 id=$1;
 raw_nii=$2;
@@ -62,7 +62,7 @@ if [[ ( ! -f ${mask} || ! -e ${orient_string} ) &&  ! -f ${tmp_mask} ]];then
     if [[ ! -f ${tmp_mask} ]];then
 	if (($human));then
 	    bet ${raw_dwi} ${tmp_mask/_mask/} -m -n;
-	else
+	#else
 	    ##########enter strip mask stuff here
 	fi
     fi

@@ -174,14 +174,14 @@ c_vol=0;
 echo "Extracting the following bvals (with tolerance of +/- ${tolerance}):  bvals=${bval_1} ${bval_2} ${bval_3} ${bval_4}";
 for bvalue in $(more $bvals_list);do
     bvalue=$( echo "$bvalue" | awk -F"E" 'BEGIN{OFMT="%0.0f"} {print $1 * (10 ^ $2)}');
-
+    echo $bvalue
    for c_bval in $bval_1 $bval_2 $bval_3 $bval_4;do
        
        if [[ "x${c_bval}x" != "xx" ]];then
 	   l_bval=$((c_bval-$tolerance));
 	   u_bval=$((c_bval+$tolerance));
 	   if [[ ${bvalue} -lt ${u_bval} ]] && [[ ${bvalue} -gt ${l_bval} ]];then
-
+               echo 'checkpoint 1'               
 	       vol_list="${vol_list}${c_vol},";
 	       num_string=$(printf "%03d\n" ${c_vol}); 
 	       vol_xxx_out="${work}/${runno}_m${num_string}.${ext}";
