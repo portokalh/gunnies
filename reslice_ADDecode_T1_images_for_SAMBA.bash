@@ -13,6 +13,15 @@ if [[ ! -e "${GD}" ]];then
 	fi
 fi
 
+
+slurm=$(which sbatch 2>/dev/null |wc -l | tr -d [:space:])
+
+if (($slurm));then
+	submitter=${GD}/submit_slurm_cluster_job.bash
+else
+	submitter=${GD}/submit_sge_cluster_job.bash
+fi
+
 contrast=T1
 protocol=MPRAGE
 spin_me_round=0;
@@ -101,7 +110,7 @@ for runno in 01912;do
 			if [[ ! -e ${masked_T1} ]];then
 				job_name="reorient_and_mask_${Srunno}_T1"
 				sbatch_dir="${BD}Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/sbatch"
-				cmd="${GD}submit_slurm_cluster_job.bash ${sbatch_dir} ${job_name} 0 0 ${cmd_1}${cmd_2}";
+				cmd="${submitter} ${sbatch_dir} ${job_name} 0 0 ${cmd_1}${cmd_2}";
 				$cmd;
 			fi
 		fi
