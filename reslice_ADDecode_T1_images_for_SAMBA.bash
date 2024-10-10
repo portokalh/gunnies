@@ -94,16 +94,15 @@ for runno in 01912;do
 						${GD}/nifti_header_splicer.bash ${qial_dwi} ${reslice_out} ${SAMBA_input};
 					fi
 				fi
-				masked_T1=/mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_T1_masked.nii.gz
-				cmd_1="/mnt/clustertmp/common/rja20_dev//matlab_execs_for_SAMBA//img_transform_executable/run_img_transform_exec.sh /mnt/clustertmp/common/rja20_dev//MATLAB2015b_runtime/v90 /${BD}/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-inputs/${Srunno}_T1.nii.gz RPI RPI ${BD}/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/;"
-				cmd_2="fslmaths /mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_T1.nii.gz -mas /mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_mask.nii.gz ${masked_T1} -odt 'input';if [[ -f ${masked_T1} ]];then rm /mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_T1.nii.gz;fi"
-				if [[ ! -e ${masked_T1} ]];then
-					job_name="reorient_and_mask_${Srunno}_T1"
-					sbatch_dir="/mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/sbatch"
-					cmd="${GD}submit_slurm_cluster_job.bash ${sbatch_dir} ${job_name} 0 0 ${cmd_1}${cmd_2}";
-					$cmd;
-				fi
-			
+			fi
+			masked_T1=/mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_T1_masked.nii.gz
+			cmd_1="/mnt/clustertmp/common/rja20_dev//matlab_execs_for_SAMBA//img_transform_executable/run_img_transform_exec.sh /mnt/clustertmp/common/rja20_dev//MATLAB2015b_runtime/v90 /${BD}/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-inputs/${Srunno}_T1.nii.gz RPI RPI ${BD}/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/;"
+			cmd_2="fslmaths /mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_T1.nii.gz -mas /mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_mask.nii.gz ${masked_T1} -odt 'input';if [[ -f ${masked_T1} ]];then rm /mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/${Srunno}_T1.nii.gz;fi"
+			if [[ ! -e ${masked_T1} ]];then
+				job_name="reorient_and_mask_${Srunno}_T1"
+				sbatch_dir="/mnt/munin6/Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-work/preprocess/sbatch"
+				cmd="${GD}submit_slurm_cluster_job.bash ${sbatch_dir} ${job_name} 0 0 ${cmd_1}${cmd_2}";
+				$cmd;
 			fi
 		fi
 	done	
