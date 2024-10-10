@@ -31,8 +31,8 @@ fi
 
 upper_dir="${BD}Badea/ADdecode.01/Data/Anat/";
 SAMBA_dir="${BD}Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-inputs/"
-#for runno in $(ls -d ${upper_dir} 2*/);do
-for runno in 01912;do
+for runno in $(ls -d ${upper_dir} 2*/);do
+#for runno in 01912;do
 	runno=${runno##*_};
 	runno=${runno/\//};
 	Srunno="S${runno/\//}";
