@@ -59,23 +59,22 @@ for runno in 01912;do
 							if (($spin_me_round));then
 								# Splice header from qial_dwi on to the resliced data,
 								# Needed if we had to rotate: final header splice:
-								/mnt/clustertmp/common/rja20_dev/gunnies/nifti_header_splicer.bash ${qial_dwi} ${reslice_out} ${better_header}
+								~/Documents/MATLAB/gunnies/nifti_header_splicer.bash ${qial_dwi} ${reslice_out} ${better_header}
 							fi
 						fi
 						if (($spin_me_round));then
 							## POSSIBLY OPTIONAL--MANUALLY CHECK IMAGES FOR INCONSISTENCIES!
 							# Rotate 180 degrees around z-axis:
-							/mnt/clustertmp/common/rja20_dev//matlab_execs_for_SAMBA//img_transform_executable/run_img_transform_exec.sh /mnt/clustertmp/common/rja20_dev//MATLAB2015b_runtime/v90 ${better_header} LPS RAS ${almost_there};
+							echo Unable to run command: /mnt/clustertmp/common/rja20_dev//matlab_execs_for_SAMBA//img_transform_executable/run_img_transform_exec.sh /mnt/clustertmp/common/rja20_dev//MATLAB2015b_runtime/v90 ${better_header} LPS RAS ${almost_there};
 						fi
 					fi  
 				 
 					if (($spin_me_round));then
-						/mnt/clustertmp/common/rja20_dev/gunnies/nifti_header_splicer.bash ${qial_dwi} ${almost_there} ${SAMBA_input};
+						~/Documents/MATLAB/gunnies/nifti_header_splicer.bash ${qial_dwi} ${almost_there} ${SAMBA_input};
 					else
-						/mnt/clustertmp/common/rja20_dev/gunnies/nifti_header_splicer.bash ${qial_dwi} ${reslice_ou} ${SAMBA_input};
+						~/Documents/MATLAB/gunnies/nifti_header_splicer.bash ${qial_dwi} ${reslice_ou} ${SAMBA_input};
 					fi
 				fi
 			fi
-		fi
 	done	
 done 
