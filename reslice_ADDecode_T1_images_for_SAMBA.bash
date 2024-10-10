@@ -1,5 +1,11 @@
 #! /bin/env/bash
 
+
+contrast=T1
+protocol=MPRAGE
+spin_me_round=1;
+
+
 BD=/mnt/munin2/;
 if [[ ! -e "${BD}Badea" ]];then
 	BD=/Volumes/Data/;
@@ -22,9 +28,7 @@ else
 	submitter=${GD}/submit_sge_cluster_job.bash
 fi
 
-contrast=T1
-protocol=MPRAGE
-spin_me_round=0;
+
 upper_dir="${BD}Badea/ADdecode.01/Data/Anat/";
 SAMBA_dir="${BD}Badea/Lab/mouse/VBM_21ADDecode03_IITmean_RPI_fullrun-inputs/"
 #for runno in $(ls -d ${upper_dir} 2*/);do
