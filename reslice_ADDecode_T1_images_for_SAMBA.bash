@@ -35,6 +35,7 @@ for runno in $(ls -d ${upper_dir} 2*/);do
 #for runno in 01912;do
 	runno=${runno##*_};
 	runno=${runno/\//};
+	echo "Runno = ${runno}"
 	Srunno="S${runno/\//}";
 	for bxh in $(ls ${upper_dir}/*${runno}/*_0??.bxh);do
 		test=$(grep -i ${protocol} ${bxh} 2>/dev/null | wc -l);
