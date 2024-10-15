@@ -95,7 +95,7 @@ if (( $output_gz )) || ((  $copy_data == 0 ));then
 
     limit=1000000000; # Arbitrarily set to ~1GBi (but can be changed to your liking here)
     human_readable_limit="1 GBi";
-    if (( $test > $limit ));then 
+    if [[ $test -gt $limit ]];then 
 	echo "WARNING: Your uncompressed data size is greater than ${human_readable_limit}; this process may take an inconveniently amount of time to complete!";
 	echo "         You may want to consider aborting.";
 	sleep 5;
