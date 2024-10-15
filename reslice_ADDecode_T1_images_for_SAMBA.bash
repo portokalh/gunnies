@@ -57,7 +57,7 @@ for runno in $(ls -d ${upper_dir}2*/);do
 				#	if [[ ! -e ${qial_dwi} ]];then
 				#		qial_dwi="/mnt/munin2/Badea/Lab/human/AD_Decode/diffusion_prep_locale/diffusion_prep_S${runno}/S${runno}_subjspace_fa.nii.gz";
 				#		if [[ ! -e ${qial_dwi} ]];then
-							echo "FAILURE: Cannot find and FA image for runno: ${Srunno}" && exit 1;
+							echo "FAILURE: Cannot find any FA image for runno: ${Srunno}" && exit 1;
 				#		fi
 				#	fi
 				fi
@@ -82,6 +82,7 @@ for runno in $(ls -d ${upper_dir}2*/);do
 									
 								fi
 								# Reslice T1 into that first DWI volume:
+								echo antsApplyTransforms -v 1 -d 3  -i ${qial_T1} -r ${t_vol1} -n BSpline -o ${reslice_out};
 								antsApplyTransforms -v 1 -d 3  -i ${qial_T1} -r ${t_vol1} -n BSpline -o ${reslice_out};
 							fi
 				
