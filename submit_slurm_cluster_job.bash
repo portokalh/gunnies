@@ -43,19 +43,19 @@ else
 fi
 
 if [[ "x${memory}x" == "x0x" ]];then
-    memory='50000M';
+    memory='5000M';
 fi
 
-
-
 echo "#!/bin/bash" > ${sbatch_file};
-echo "#SBATCH --mem=$memory" >> ${sbatch_file};
+if [[ "x${memory}x" != "x0x" ]];then
+	echo "#SBATCH --mem=$memory" >> ${sbatch_file};
+fi
 echo "#SBATCH --mail-user=${email}" >> ${sbatch_file};
 echo "#SBATCH --mail-type=END,FAIL" >> ${sbatch_file}; 
-echo "#SBATCH --output=${batch_path}/slurm-%j.out" >> ${sbatch_file};
-echo "#SBATCH --error=${batch_path}/slurm-%j.out" >> ${sbatch_file};
+echo "#SBATCH --output=${sbatch_folder}/slurm-%j.out" >> ${sbatch_file};
+echo "#SBATCH --error=${sbatch_folder}/slurm-%j.out" >> ${sbatch_file};
 echo "#SBATCH --job-name=${name}" >> ${sbatch_file};
-
+echo "#SBATCH --partition=normal" >> ${sbatch_file};
 if [[ "x${hold_jobs}x" != "xx" ]] && [[ "x${hold_jobs}x" != "x0x" ]];then
     echo "#SBATCH --dependency=afterok:${hold_jobs}" >> ${sbatch_file};
 fi
@@ -68,7 +68,7 @@ sub_cmd="sbatch ${sbatch_file}";
 
 echo $sub_cmd;
 
-job_id=$(sbatch sub_cmd | cut -d ' ' -f 4)
+job_id=$(${sub_cmd} | cut -d ' ' -f 4)
 echo "JOB ID = ${job_id}; Job Name = ${name}";
 
 #new_sbatch_file=${sbatch_file/${name}/${job_id}_${name}};
