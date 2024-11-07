@@ -90,7 +90,7 @@ for bxh in $(ls ${upper_dir}/*${runno}/*_0??.bxh);do
 							fi
 							xform_prefix=S${runno}_T1_to_mean_DWI_;
 							xform="${xform_prefix}0GenericAffine.mat";
-							${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${t_vol1},${qial_T1},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-7,15 ] -s 2x1x0.5vox -f 4x2x1 -u 1 -z 1 -o ${xform_prefix};
+							${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${t_vol1},${qial_T1},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 2x1x0.5vox -f 4x2x1 -u 1 -z 1 -o ${xform_prefix};
 							
 							
 							# Reslice T1 into that first DWI volume:
