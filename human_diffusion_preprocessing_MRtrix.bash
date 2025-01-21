@@ -176,7 +176,7 @@ b0=${work_dir}/${id}_b0.nii.gz;
 dwi=${work_dir}/${id}_dwi.nii.gz;
 
 mif=${debiased};
-final_nii_nii4D=${debiased/\.mif/\.nii\.gz};
+final_nii4D=${debiased/\.mif/\.nii\.gz};
 if [[ ! -f ${b0} || ! -f ${dwi} ]];then
 	mrconvert ${mif} ${final_nii4D};
 fi
