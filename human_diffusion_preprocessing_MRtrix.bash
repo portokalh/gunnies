@@ -187,11 +187,11 @@ nominal_bval=$(more ${bvals} | tr -s [:space:] "\n" | sed 's|.*|(&+50)/100*100|'
 bval_zero=$(more ${bvals} | tr -s [:space:] "\n" | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] "\n" | head -1);
 
 if [[ ! -f ${dwi} ]];then
-	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
+	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
 fi
 
 if [[ ! -f ${b0} ]];then
-	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} 0 ${bval_zero};
+	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} 0 ${bval_zero};
 fi
 
 #######
