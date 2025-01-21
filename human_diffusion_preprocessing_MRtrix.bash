@@ -1,10 +1,11 @@
 #! /bin/bash
 # Process name
-proc_name="diffusion_prep"; # Not gonna call it diffusion_calc so we don't assume it does the same thing as the civm pipeline
+proc_name="diffusion_prep_MRtrix"; # Not gonna call it diffusion_calc so we don't assume it does the same thing as the civm pipeline
 
 ## 15 June 2020, BJA: I still need to figure out the best way to pull out the non-zero bval(s) from the bval file.
 ## For now, hardcoding it to 1000 to run Whitson data. # 8 September 2020, BJA: changing to 800 for Sinha data.
 ## 24 January 2022, BJA: Changing bval to 2400 for Manisha's data.
+## 21 January 2025, BJA: Totally rewrote based around chatGPT's answer when asking how to preprocess using MRtrix
 
 # Will try to auto-extract bval going forward...though it is not yet designed to handle multi-shell acquisitions.
 #nominal_bval='2000';
@@ -12,6 +13,11 @@ proc_name="diffusion_prep"; # Not gonna call it diffusion_calc so we don't assum
 GD=${GUNNIES}
 if [[ ! -d ${GD} ]];then
 	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
+fi
+
+BD=${BIGGUS_DISKUS}
+if [[ ! -d ${BD} ]];then
+	echo "env variable '$BIGGUS_DISKUS' not defined...failing now..."  && exit 1
 fi
 
 
@@ -27,7 +33,7 @@ fi
 
 echo "Processing diffusion data with runno/id: ${id}.";
 
-work_dir=${BIGGUS_DISKUS}/${proc_name}_${id};
+work_dir=${BD}/${proc_name}_${id};
 
 if [[ ! -d ${work_dir} ]];then
     mkdir -pm 775 ${work_dir};
