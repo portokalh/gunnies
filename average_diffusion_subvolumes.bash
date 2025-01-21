@@ -42,13 +42,28 @@ bval_3=$6;
 bval_4=$7;
 
 ## Determine if we are running on a cluster--for now it is incorrectly assumed that all clusters are SGE clusters
-cluster=$(qstat  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
+cluster=0;
+SGE_cluster=$(qstat  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
+slurm_cluster=$(sbatch --help  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
 # This returns '1' if NOT on a cluster, so let's reverse that...
-if (($cluster));then
+if ((${SGE_cluster} && ${slurm_cluster}));then
     cluster=0;
 else
     cluster=1;
     echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
+    if ((! ${slurm_cluster}));then
+		sub_script=${GUNNIES}/submit_slurm_cluster_job.bash
+		if [[ ! -f ${sub_script} ]];then
+			/mnt/clustertmp/common/rja20_dev/gunnies/submit_slurm_cluster_job.bash
+		fi
+	fi
+    if ((! ${SGE_cluster}));then
+		sub_script=${GUNNIES}/submit_sge_cluster_job.bash
+		if [[ ! -f ${sub_script} ]];then
+			/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash
+		fi
+	fi
+
 fi
 
 
@@ -192,14 +207,24 @@ for bvalue in $(more $bvals_list);do
 	       if [[ ! -e ${vol_xxx_out} ]];then
 		   # Note: I need to make sure $c_vol should be indexed from 0 (vs from 1) for this command
 		   extract_cmd="${ap}ExtractSliceFromImage 4 ${nii4D} ${vol_xxx_out} 3 ${c_vol} 0;";
-		   if (($cluster));then
+		   if ((${SGE_cluster}));then
 		       job_name="extract_vol_${c_vol}_from_${runno}";
 		       sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
 		      # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
 		       job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 		       if ((! $?));then
-			   jid_list="${jid_list}${job_id},";
+				jid_list="${jid_list}${job_id},";
 		       fi
+		   elif ((${slurm_cluster}))
+				job_name="extract_vol_${c_vol}_from_${runno}";
+		       	sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_slurm_cluster_job.bash ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
+		      # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
+		       job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+		       if ((! $?));then
+				jid_list="${jid_list}${job_id},";
+		       fi	   
+		   
+		   
 		   else
 		       ${extract_command};
 		   fi
@@ -225,18 +250,18 @@ average_cmd="${ap}AverageImages 3 ${output} 0 ${reassemble_list};";
 if [[ "x${vol_list}x" != "xx" ]];then
     
     if [[ ! -f ${output} ]];then
-	if (($cluster));then
-	    job_name="final_averaging_${job_desc}_${runno}_b${bval_1}";
-	    # REMOVE 'echo' in rm_cmd after testing!
-	    rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -r $work;fi;fi;" 
-	    final_cmd="${average_cmd}${rm_cmd}";	
-	    sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
-	    job_id=$(${sub_cmd});
-
-	    echo "JOB ID = ${job_id}; Job Name = ${job_name}";
-	else
-	    ${average_cmd};
-	fi
+		if ((${cluster}));then
+			job_name="final_averaging_${job_desc}_${runno}_b${bval_1}";
+			# REMOVE 'echo' in rm_cmd after testing!
+			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -r $work;fi;fi;" 
+			final_cmd="${average_cmd}${rm_cmd}";	
+			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
+			job_id=$(${sub_cmd});
+	
+			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
+		else
+			${average_cmd};
+		fi
     fi 
 else
     echo "Whoops! No bvalues found with that/those values in ${bvals_list}.";
