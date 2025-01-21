@@ -54,6 +54,8 @@ bxheader=${raw_nii/nii.gz/bxh}
 bvecs=${work_dir}/${id}_bvecs.txt;
 bvals=${bvecs/bvecs/bvals};
 
+echo "Bvecs: ${bvecs}";
+
 if [[ ! -f ${bvecs} ]];then
     bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
     $bvec_cmd;
