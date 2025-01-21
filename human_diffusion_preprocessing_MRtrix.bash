@@ -190,7 +190,7 @@ if [[ ! -f ${dwi} ]];then
 	${GD}/average_diffusion_subvolumes.bash ${final_dwi_nii4D} $bvals ${dwi} ${nominal_bval};
 fi
 
-if [[ -! -f ${b0} ]];then
+if [[ ! -f ${b0} ]];then
 	${GD}/average_diffusion_subvolumes.bash ${final_dwi_nii4D} $bvals ${dwi} 0 ${bval_zero};
 fi
 
