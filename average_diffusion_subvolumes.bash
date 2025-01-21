@@ -207,24 +207,14 @@ for bvalue in $(more $bvals_list);do
 	       if [[ ! -e ${vol_xxx_out} ]];then
 		   # Note: I need to make sure $c_vol should be indexed from 0 (vs from 1) for this command
 		   extract_cmd="${ap}ExtractSliceFromImage 4 ${nii4D} ${vol_xxx_out} 3 ${c_vol} 0;";
-		   if ((${SGE_cluster}));then
+		   if ((${cluster}));then
 		       job_name="extract_vol_${c_vol}_from_${runno}";
-		       sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
+		       sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
 		      # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
 		       job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 		       if ((! $?));then
 				jid_list="${jid_list}${job_id},";
 		       fi
-		   elif ((${slurm_cluster}))
-				job_name="extract_vol_${c_vol}_from_${runno}";
-		       	sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_slurm_cluster_job.bash ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
-		      # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
-		       job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-		       if ((! $?));then
-				jid_list="${jid_list}${job_id},";
-		       fi	   
-		   
-		   
 		   else
 		       ${extract_command};
 		   fi
