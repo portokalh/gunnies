@@ -10,7 +10,9 @@ humorous_statement="GASP!!! I'm...I'm dying...";
 
 # Right away, there is concern that the recorded bval for B0 images might even be greater than 100...
 #  and this could easily break the production of B0 images, with nominal bval=0...increasing it to 150.
-tolerance=150;
+# *a few years later...*
+# Increasing to 250. Have at least one situation where"b=0" approaches 200.
+tolerance=250;
 
 # Note that this code does not test to ensure that the number of bvals in the bval table match the number of volumes in the 4D nifti.
 # Also note that this doesn't seem to always clean up its temp work directory after itself on a reliable basis...may need to occassional manually clean up afterwards.

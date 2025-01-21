@@ -196,7 +196,7 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 done
 
 #Trim trailing comma from job id list:
-if (($jid_list}));then
+if ((${jid_list}));then
     jid_list=${jid_list%,};
 else
     jid_list='0';
