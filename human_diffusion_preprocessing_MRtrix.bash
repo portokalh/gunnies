@@ -66,12 +66,21 @@ denoised=${work_dir}/${id}_${stage}_dwi_nii4D_denoised.nii.gz
 if [[ ! -f ${denoised} ]];then
 	dwidenoise $raw_nii ${denoised}
 fi
+
+if [[ ! -f ${denoised} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
 ###
 # 2. Gibbs ringing correction (optional)
 stage='02';
 degibbs=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
-if [[ ! -f ${degobbs} ]];then
+if [[ ! -f ${degibbs} ]];then
 	mrdegibbs ${denoised} ${degibbs}
+fi
+
+if [[ ! -f ${degibbs} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
 fi
 
 ###
@@ -82,7 +91,9 @@ if [[ ! -f ${dwi_mif} ]];then
 	mrconvert ${degibbs} ${dwi_mif} -fslgrad ${bvecs} ${bvals};
 fi
 
-
+if [[ ! -f ${dwi_mif} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
 ###
 # 4. Perform motion and eddy current correction (requires FSL's `eddy`)
 stage='04'
@@ -91,6 +102,9 @@ if [[ ! -f ${preprocessed} ]];then
 	dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
 fi
 
+if [[ ! -f ${preprocessed} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
 ###
 # 5. Bias field correction (optional but recommended)
 stage='05';
@@ -99,6 +113,9 @@ if [[ ! -f ${debiased} ]];then
 	dwibiascorrect ants ${preprocessed} ${debiased}
 fi
 
+if [[ ! -f ${debiased} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
 ###
 # 6. Fit the tensor model
 stage='06';
@@ -107,6 +124,9 @@ if [[ ! -f ${dt} ]];then
 	dwi2tensor ${debiased} ${dt};
 fi
 
+if [[ ! -f ${dt} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
 ###
 # 7. Compute FA (and other metrics, if desired)
 stage='07';
@@ -118,6 +138,9 @@ if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
 	tensor2metric ${dt} -fa ${fa} -adc ${adc} -rd ${rd} -ad ${ad};
 fi
 
+if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
 ###
 # 8. Convert FA (or other metrics) to NIfTI for visualization
 for contrast in fa adc rd ad;do
