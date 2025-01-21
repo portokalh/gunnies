@@ -71,12 +71,28 @@ if [[ ! -f ${bvecs} ]];then
     $bvec_cmd;
 fi
 #######
-##
-# 1. Denoise the raw DWI data
+###
+# 3. --> 1. Convert DWI data to MRtrix format
 stage='01';
-denoised=${work_dir}/${id}_${stage}_dwi_nii4D_denoised.nii.gz
+dwi_mif=${work_dir}/${id}_${stage}_dwi_nii4D.mif;
+if [[ ! -f ${dwi_mif} ]];then
+	# Moved convert to mif from stage 3 to stage 1
+	#mrconvert ${degibbs} ${dwi_mif} -fslgrad ${bvecs} ${bvals};
+	mrconvert ${raw_nii} ${dwi_mif} -fslgrad ${bvecs} ${bvals};
+fi
+
+if [[ ! -f ${dwi_mif} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+###
+# 1. --> 2. Denoise the raw DWI data
+stage='02';
+#denoised=${work_dir}/${id}_${stage}_dwi_nii4D_denoised.nii.gz
+denoised=${work_dir}/${id}_${stage}_dwi_nii4D_denoised.mif
 if [[ ! -f ${denoised} ]];then
-	dwidenoise $raw_nii ${denoised}
+	# Moved denoise from stage 1 to stage 2:
+	#dwidenoise $raw_nii ${denoised}
+	dwidenoise ${dwi_mif} ${denoised}
 fi
 
 if [[ ! -f ${denoised} ]];then
@@ -84,9 +100,10 @@ if [[ ! -f ${denoised} ]];then
 fi
 
 ###
-# 2. Gibbs ringing correction (optional)
-stage='02';
-degibbs=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
+# 2. --> 3 Gibbs ringing correction (optional)
+stage='03';
+#degibbs=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
+degibbs=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.mif;
 if [[ ! -f ${degibbs} ]];then
 	mrdegibbs ${denoised} ${degibbs}
 fi
@@ -95,23 +112,15 @@ if [[ ! -f ${degibbs} ]];then
 	echo "Process died during stage ${stage}" && exit 1;
 fi
 
-###
-# 3. Convert DWI data to MRtrix format
-stage='03';
-dwi_mif=${work_dir}/${id}_${stage}_dwi_nii4D.mif;
-if [[ ! -f ${dwi_mif} ]];then
-	mrconvert ${degibbs} ${dwi_mif} -fslgrad ${bvecs} ${bvals};
-fi
 
-if [[ ! -f ${dwi_mif} ]];then
-	echo "Process died during stage ${stage}" && exit 1;
-fi
 ###
 # 4. Perform motion and eddy current correction (requires FSL's `eddy`)
 stage='04'
 preprocessed=${work_dir}/${id}_${stage}_dwi_nii4D_preprocessed.mif;
 if [[ ! -f ${preprocessed} ]];then
-	dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
+	# Moved around first 3 steps; updating accordingly:
+	# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
+	dwifslpreproc ${degibbs} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
 fi
 
 if [[ ! -f ${preprocessed} ]];then
