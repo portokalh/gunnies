@@ -57,6 +57,16 @@ bvals=${bvecs/bvecs/bvals};
 echo "Bvecs: ${bvecs}";
 
 if [[ ! -f ${bvecs} ]];then
+	cp ${raw_nii/\.nii\.gz/bvecs} ${bvecs}
+fi
+
+if [[ ! -f ${bvals} ]];then
+	cp ${raw_nii/\.nii\.gz/bvals} ${bvals}
+fi
+
+
+
+if [[ ! -f ${bvecs} ]];then
     bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
     $bvec_cmd;
 fi
