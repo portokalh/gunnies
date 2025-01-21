@@ -34,7 +34,7 @@ fi
 echo "Processing diffusion data with runno/id: ${id}.";
 
 work_dir=${BD}/${proc_name}_${id};
-
+echo "Work directory: ${work_dir}";
 if [[ ! -d ${work_dir} ]];then
     mkdir -pm 775 ${work_dir};
 fi
@@ -69,7 +69,7 @@ fi
 ###
 # 2. Gibbs ringing correction (optional)
 stage='02';
-degibbs=${work}_dir/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
+degibbs=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
 if [[ ! -f ${degobbs} ]];then
 	mrdegibbs ${denoised} ${degibbs}
 fi
