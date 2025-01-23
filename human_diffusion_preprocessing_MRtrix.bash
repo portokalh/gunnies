@@ -144,10 +144,11 @@ if [[ ! -f ${debiased} ]];then
 	if [[ ! -f ${preprocessed} ]];then
 		# Moved around first 3 steps; updating accordingly:
 		# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
-		json_string=" ";
+		json_string="";
 		maybe_json=${raw_nii/\.nii\.gz/json};
 		if [[ -f ${maybe_json} ]];then
-			json_string=" -json_import ${maybe_json} "
+			json_string=" -json_import ${maybe_json} ";
+		fi
 		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol " -scratch ${work_dir}/
 		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 	fi
@@ -196,7 +197,7 @@ fa=${work_dir}/${id}_${stage}_fa.mif;
 adc=${work_dir}/${id}_${stage}_adc.mif;
 rd=${work_dir}/${id}_${stage}_rd.mif;
 ad=${work_dir}/${id}_${stage}_ad.mif;
-out_string=" "
+out_string=" ";
 if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
 	for contrast in fa adc rd ad;do
 		c_mif=${work_dir}/${id}_${stage}_${contrast}.mif;
@@ -205,7 +206,7 @@ if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
 			out_string="${out_string} -${contrast} ${c_mif}"
 		fi
 	done
-	tensor2metric ${dt} -fa ${fa} -adc ${adc} -rd ${rd} -ad ${ad};
+	tensor2metric ${dt} ${out_string};
 fi
 
 if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
