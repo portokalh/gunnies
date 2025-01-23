@@ -115,7 +115,7 @@ if [[ ! -f ${debiased} ]];then
 	
 	if [[ ! -f ${denoised} ]];then
 		echo "Process died during stage ${stage}" && exit 1;
-	elif ((${cleanup}))
+	elif ((${cleanup}));then
 		if [[ -f ${dwi_mif} ]];then
 			rm ${dwi_mif};
 		fi
@@ -132,7 +132,7 @@ if [[ ! -f ${debiased} ]];then
 	
 	if [[ ! -f ${degibbs} ]];then
 		echo "Process died during stage ${stage}" && exit 1;
-	elif ((${cleanup}))
+	elif ((${cleanup}));then
 		if [[ -f ${denoised} ]];then
 			rm ${denoised};
 		fi
@@ -154,7 +154,7 @@ if [[ ! -f ${debiased} ]];then
 	
 	if [[ ! -f ${preprocessed} ]];then
 		echo "Process died during stage ${stage}" && exit 1;
-	elif ((${cleanup}))
+	elif ((${cleanup}));then
 		if [[ -f ${degibbs} ]];then
 			rm ${degibbs};	
 		fi
@@ -169,7 +169,7 @@ if [[ ! -f ${debiased} ]];then
 	
 	if [[ ! -f ${debiased} ]];then
 		echo "Process died during stage ${stage}" && exit 1;
-	elif ((${cleanup}))
+	elif ((${cleanup}));then
 		if [[ -f ${preprocessed} ]];then
 			rm ${preprocessed};
 		fi
@@ -234,7 +234,7 @@ mif=${debiased};
 final_nii4D=${debiased/\.mif/\.nii\.gz};
 if [[ ! -f ${b0} || ! -f ${dwi} ]];then
 	mrconvert ${mif} ${final_nii4D};
-elif ((${cleanup}))
+elif ((${cleanup}));then
 	if [[ -f  ${final_nii4D} ]];then
 		rm ${final_nii4D};
 	fi
