@@ -27,7 +27,7 @@ BD2=${BD%/}
 mama_dir=${BD2%/*};
 baby_dir=${BD2##*/};
 if [[ 'xmousex' == "x${baby_dir}x" ]];then
-	BD="${mama_dir}human/";
+	BD="${mama_dir}/human/";
 	export BIGGUS_DISKUS=$BD;
 	if [[ ! -d $BD ]];then
 		mkdir -m 775 ${BD};
