@@ -252,7 +252,7 @@ if [[ ! -f ${b0} ]];then
 fi
 
 if [[ -f ${b0} && -f ${dwi} ]];then
-	if ((${cleanup}))
+	if ((${cleanup}));then
 		if [[ -f  ${final_nii4D} ]];then
 			rm ${final_nii4D};
 		fi
