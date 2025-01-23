@@ -150,7 +150,7 @@ if [[ ! -f ${debiased} ]];then
 		#if [[ -f ${maybe_json} ]];then
 		#	json_string=" -json_import ${maybe_json} ";
 		#fi
-		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/
+		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
 		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 	fi
 	
