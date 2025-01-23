@@ -164,7 +164,7 @@ if [[ ! -f ${debiased} ]];then
 	stage='05';
 	debiased=${work_dir}/${id}_${stage}_dwi_nii4D_biascorrected.mif
 	if [[ ! -f ${debiased} ]];then
-		dwibiascorrect ants ${preprocessed} ${debiased}
+		dwibiascorrect ants ${preprocessed} ${debiased} -scratch ${work_dir}/
 	fi
 	
 	if [[ ! -f ${debiased} ]];then
