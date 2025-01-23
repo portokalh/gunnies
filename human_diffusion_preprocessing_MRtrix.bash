@@ -144,12 +144,13 @@ if [[ ! -f ${debiased} ]];then
 	if [[ ! -f ${preprocessed} ]];then
 		# Moved around first 3 steps; updating accordingly:
 		# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
-		json_string="";
+		json_string=" -pe_dir AP ";
 		maybe_json=${raw_nii/\.nii\.gz/json};
-		if [[ -f ${maybe_json} ]];then
-			json_string=" -json_import ${maybe_json} ";
-		fi
-		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol " -scratch ${work_dir}/
+		# Using the json file does not seem to properly provide the PE direction. 
+		#if [[ -f ${maybe_json} ]];then
+		#	json_string=" -json_import ${maybe_json} ";
+		#fi
+		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/
 		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 	fi
 	
