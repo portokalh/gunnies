@@ -218,6 +218,11 @@ fi
 for contrast in fa adc rd ad;do
 	mif=${work_dir}/${id}_${stage}_${contrast}.mif;
 	nii=${work_dir}/${id}_${contrast}.nii.gz;
+	
+	if [[ ! -f ${nii} ]];then
+		mrconvert ${mif} ${nii};
+	fi
+	
 	if [[ -f ${nii} && -f ${mif} ]];then
 		if ((${cleanup}));then
 			rm ${mif};
