@@ -251,7 +251,7 @@ dwi=${work_dir}/${id}_dwi.nii.gz;
 mif=${debiased};
 final_nii4D=${debiased/\.mif/\.nii\.gz};
 if [[ ! -f ${b0} || ! -f ${dwi} ]];then
-	if [[ ! -f ${final_nii4D}]];then
+	if [[ ! -f ${final_nii4D} ]];then
 		mrconvert ${mif} ${final_nii4D};
 	fi
 elif ((${cleanup}));then
