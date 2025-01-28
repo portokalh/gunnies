@@ -259,9 +259,11 @@ elif ((${cleanup}));then
 		rm ${final_nii4D};
 	fi
 fi
-
+echo "NOMB Checkpoint";
 nominal_bval=$(more ${bvals} | tr -s [:space:] "\n" | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] "\n" | tail -1);
+echo "NOMB_BVZ_checkpoint";
 bval_zero=$(more ${bvals} | tr -s [:space:] "\n" | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] "\n" | head -1);
+echo "BVZ_checkpoint";
 
 if [[ ! -f ${dwi} ]];then
 	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
