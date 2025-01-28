@@ -89,6 +89,8 @@ fi
 # 3. --> 1. Convert DWI data to MRtrix format
 
 presumed_debiased_stage='05';
+# Add one to presumed_debiased_stage:
+pds_plus_one='06';
 debiased=${work_dir}/${id}_${presumed_debiased_stage}_dwi_nii4D_biascorrected.mif
 if [[ ! -f ${debiased} ]];then
 	stage='01';
@@ -177,7 +179,7 @@ if [[ ! -f ${debiased} ]];then
 		fi
 	fi
 else
-	echo "Debiased mif file already exists; skipping through stages through Stage ${stage}." 
+	echo "Debiased mif file already exists; skipping to Stage ${pds_plus_one}." 
 fi
 
 ###
@@ -195,24 +197,33 @@ fi
 # 7. Compute FA (and other metrics, if desired)
 stage='07';
 fa=${work_dir}/${id}_${stage}_fa.mif;
+fa_nii=${work_dir}/${id}_fa.nii.gz;
 adc=${work_dir}/${id}_${stage}_adc.mif;
+adc_nii=${work_dir}/${id}_adc.nii.gz;
 rd=${work_dir}/${id}_${stage}_rd.mif;
+rd_nii=${work_dir}/${id}_rd.nii.gz;
 ad=${work_dir}/${id}_${stage}_ad.mif;
+ad_nii=${work_dir}/${id}_ad.nii.gz;
 out_string=" ";
-if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
-	for contrast in fa adc rd ad;do
-		c_mif=${work_dir}/${id}_${stage}_${contrast}.mif;
-		nii=${work_dir}/${id}_${contrast}.nii.gz;
-		if [[ ! -f ${nii} && ! -f ${c_mif} ]];then
-			out_string="${out_string} -${contrast} ${c_mif}"
-		fi
-	done
-	tensor2metric ${dt} ${out_string};
+
+if [[ ! -f ${fa_nii} || ! -f ${adc_nii} || ! -f ${rd_nii} || ! -f ${ad_nii} ]];then
+
+	if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
+		for contrast in fa adc rd ad;do
+			c_mif=${work_dir}/${id}_${stage}_${contrast}.mif;
+			nii=${work_dir}/${id}_${contrast}.nii.gz;
+			if [[ ! -f ${nii} && ! -f ${c_mif} ]];then
+				out_string="${out_string} -${contrast} ${c_mif}"
+			fi
+		done
+		tensor2metric ${dt} ${out_string};
+	fi
+
+	if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
+		echo "Process died during stage ${stage}" && exit 1;
+	fi
 fi
 
-if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
-	echo "Process died during stage ${stage}" && exit 1;
-fi
 ###
 # 8. Convert FA (or other metrics) to NIfTI for visualization
 for contrast in fa adc rd ad;do
@@ -240,7 +251,9 @@ dwi=${work_dir}/${id}_dwi.nii.gz;
 mif=${debiased};
 final_nii4D=${debiased/\.mif/\.nii\.gz};
 if [[ ! -f ${b0} || ! -f ${dwi} ]];then
-	mrconvert ${mif} ${final_nii4D};
+	if [[ ! -f ${final_nii4D}]]
+		mrconvert ${mif} ${final_nii4D};
+	fi
 elif ((${cleanup}));then
 	if [[ -f  ${final_nii4D} ]];then
 		rm ${final_nii4D};
@@ -255,7 +268,7 @@ if [[ ! -f ${dwi} ]];then
 fi
 
 if [[ ! -f ${b0} ]];then
-	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} 0 ${bval_zero};
+	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
 fi
 
 if [[ -f ${b0} && -f ${dwi} ]];then
