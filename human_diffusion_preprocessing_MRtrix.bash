@@ -152,7 +152,13 @@ if [[ ! -f ${debiased} ]];then
 		#if [[ -f ${maybe_json} ]];then
 		#	json_string=" -json_import ${maybe_json} ";
 		#fi
-		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
+		eddy_opts='--repol --slm=linear'; 
+		n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -l);
+		if [[ ${n_shells} -gt 2 ]];then 
+			eddy_opts="${eddy_opts} --data_is_shelled ";
+		fi
+		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 8
+		#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
 		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 	fi
 	
@@ -185,6 +191,12 @@ fi
 ###
 # 6. Fit the tensor model
 stage='06';
+
+strides=${work_dir}/${id}_strides.txt
+if [[ ! -f $strides ]];then
+	mrinfo -strides ${debiased} > $strides;
+fi
+
 dt=${work_dir}/${id}_${stage}_dt.mif;
 if [[ ! -f ${dt} ]];then
 	dwi2tensor ${debiased} ${dt};
@@ -260,12 +272,13 @@ elif ((${cleanup}));then
 	fi
 fi
 
-
-nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
+all_bvals=$(mrinfo -shell_bvalues ${degibbs} | sort | uniq);
+nominal_bval=${all_bvals#*\ };
+#nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
 #echo $nominal_bval
 
-
-bval_zero=$(cat ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | head -1);
+bval_zero=${all_bvals%%\ *};
+#bval_zero=$(cat ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | head -1);
 #echo $bval_zero
 
 if [[ ! -f ${dwi} ]];then
