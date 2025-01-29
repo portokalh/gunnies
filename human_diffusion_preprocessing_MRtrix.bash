@@ -262,20 +262,20 @@ fi
 
 
 nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
-echo $nominal_bval
+#echo $nominal_bval
 
 
 bval_zero=$(cat ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | head -1);
-echo $bval_zero
+#echo $bval_zero
 
 if [[ ! -f ${dwi} ]];then
 	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
-	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
+	export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
 fi
 
 if [[ ! -f ${b0} ]];then
 	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
-	${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
+	export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
 	
 fi
 
@@ -287,5 +287,9 @@ if [[ -f ${b0} && -f ${dwi} ]];then
 	fi
 fi
 
-echo "Pipeline: ${proc_name}_${id} has completed! Thanks for patronizing this wonderful script!" && exit 0
+mask=${work_dir}/${id}_mask.nii.gz;
+if [[ ! -f ${mask} ]];then
+	bet ${b0_nii} ${mask} -m -n;
+fi
+echo "The ${proc_name}_${id} pipeline has completed! Thanks for patronizing this wonderful script!" && exit 0
 #######
