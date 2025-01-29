@@ -272,7 +272,7 @@ elif ((${cleanup}));then
 	fi
 fi
 
-all_bvals=$(mrinfo -shell_bvalues ${degibbs} | sort | uniq);
+all_bvals=$(mrinfo -shell_bvalues ${debiased} | sort | uniq);
 nominal_bval=${all_bvals#*\ };
 #nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
 #echo $nominal_bval
