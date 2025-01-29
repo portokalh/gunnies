@@ -126,17 +126,17 @@ for c_bval in bval_1 bval_2 bval_3 bval_4;do
     #c_bval=${c_bval%.*}; #Round down to nearest integer
     test_bval=${!c_bval};
     if [[ "x${test_bval}x" != "xx" ]];then
-	if ! [[ ${test_bval} =~ $re ]] ; then   
-	    echo "ABORTING: B-value of interest, '${test_bval}',is not a number" >&2;
-	    errors=1;
-	else
-	    # Beware that the following code snippet will return zero for an empty input--not good! (hence the test 2 lines above)
-	    # Beware that the following code snippet will return a number even with alpha input--not good! (hence the test 1 line above)
-	    integer_bval=$( echo "${test_bval}" | awk -F"E" 'BEGIN{OFMT="%0.0f"} {print $1 * (10 ^ $2)}'); 
-	    #echo "c_bval=${c_bval}"
-	    #echo "integer_bval=${integer_bval}";
-	    eval "${c_bval}=${integer_bval}";
-	fi
+		if ! [[ ${test_bval} =~ $re ]] ; then   
+			echo "ABORTING: B-value of interest, '${test_bval}',is not a number" >&2;
+			errors=1;
+		else
+			# Beware that the following code snippet will return zero for an empty input--not good! (hence the test 2 lines above)
+			# Beware that the following code snippet will return a number even with alpha input--not good! (hence the test 1 line above)
+			integer_bval=$( echo "${test_bval}" | awk -F"E" 'BEGIN{OFMT="%0.0f"} {print $1 * (10 ^ $2)}'); 
+			#echo "c_bval=${c_bval}"
+			#echo "integer_bval=${integer_bval}";
+			eval "${c_bval}=${integer_bval}";
+		fi
     fi
 done
 
@@ -162,11 +162,11 @@ fi
 work="${top_dir}/${job_desc}_${runno}_b${bval_1}-tmp_work/";
 if (($error_2));then
     if [[ "x${work}x" != "xx" ]];then
-	if [[ -d ${work} ]];then
-	    echo "Cleaning up completely leftover work directory now...";
-	    echo "Removing: ${work}";
-	    rm -r $work;
-	fi
+		if [[ -d ${work} ]];then
+			echo "Cleaning up completely leftover work directory now...";
+			echo "Removing: ${work}";
+			rm -r $work;
+		fi
     fi
     echo "${humorous_statement}" &&  exit 1;
 fi
