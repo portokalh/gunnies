@@ -189,7 +189,7 @@ reassemble_list=" ";
 c_vol=0;
 
 echo "Extracting the following bvals (with tolerance of +/- ${tolerance}):  bvals=${bval_1} ${bval_2} ${bval_3} ${bval_4}";
-for bvalue in $(more $bvals_list);do
+for bvalue in $(cat $bvals_list);do
     bvalue=$( echo "$bvalue" | awk -F"E" 'BEGIN{OFMT="%0.0f"} {print $1 * (10 ^ $2)}');
     echo $bvalue
    for c_bval in $bval_1 $bval_2 $bval_3 $bval_4;do
@@ -258,20 +258,20 @@ else
     echo "No output image will be generated.";
     echo "Cleaning up completely useless work directory now...";
     if [[ "x${work}x" != "xx" ]];then
-	if [[ -d ${work} ]];then
-	    rm -r $work;
-	fi
+		if [[ -d ${work} ]];then
+			rm -r $work;
+		fi
     fi
 fi
 
 
 if [[ -f ${output} ]];then
     if [[ "x${work}x" != "xx" ]];then
-	if [[ -d ${work} ]];then
-	    echo "Output image appears to successfully persist in time and space."; 
-	    echo "Cleaning up temporary work directory now...";
-	    rm -r $work;
-	fi
+		if [[ -d ${work} ]];then
+			echo "Output image appears to successfully persist in time and space."; 
+			echo "Cleaning up temporary work directory now...";
+			rm -r $work;
+		fi
     fi
 fi 
 
