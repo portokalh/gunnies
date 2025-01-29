@@ -289,7 +289,7 @@ fi
 
 mask=${work_dir}/${id}_mask.nii.gz;
 if [[ ! -f ${mask} ]];then
-	bet ${b0_nii} ${mask} -m -n;
+	bet ${b0} ${mask} -m -n;
 fi
 echo "The ${proc_name}_${id} pipeline has completed! Thanks for patronizing this wonderful script!" && exit 0
 #######
