@@ -153,7 +153,7 @@ if [[ ! -f ${debiased} ]];then
 		#	json_string=" -json_import ${maybe_json} ";
 		#fi
 		eddy_opts='--repol --slm=linear'; 
-		n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -l);
+		n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -w);
 		if [[ ${n_shells} -gt 2 ]];then 
 			eddy_opts="${eddy_opts} --data_is_shelled ";
 		fi
