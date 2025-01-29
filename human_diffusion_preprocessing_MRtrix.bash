@@ -259,7 +259,7 @@ elif ((${cleanup}));then
 		rm ${final_nii4D};
 	fi
 fi
-dv=' 2>/dev/null ';
+dv=' ';#' 2>/dev/null ';
 
 
 #nbv_cmd="more ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' $dv | bc $dv | sort $dv | uniq $dv | tail $dv | tr -s [:space:] '\n' $dv | tail -1 $dv";
