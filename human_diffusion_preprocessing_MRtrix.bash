@@ -261,12 +261,12 @@ elif ((${cleanup}));then
 fi
 dv=' 2>/dev/null ';
 
-nbv_cmd="tr -s [:space:] '\n' ${bvals} | sed 's|.*|(&+50)/100*100|' $dv | bc $dv | sort $dv | uniq $dv | tail $dv | tr -s [:space:] '\n' $dv | tail -1 $dv";
+
 #nbv_cmd="more ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' $dv | bc $dv | sort $dv | uniq $dv | tail $dv | tr -s [:space:] '\n' $dv | tail -1 $dv";
-echo ${nbv_cmd}
-nominal_bval=`$nbv_cmd`;
+#echo ${nbv_cmd}
+#nominal_bval=`$nbv_cmd`;
 #echo "nominal_bval=\$(more ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' $dv | bc $dv | sort $dv | uniq $dv | tail $dv | tr -s [:space:] '\n' $dv | tail -1 $dv )";
-#nominal_bval=$(more ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
+nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
 echo $nominal_bval
 
 echo "bval_zero=\$(more ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | head -1)";
