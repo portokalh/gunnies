@@ -250,6 +250,7 @@ if [[ "x${vol_list}x" != "xx" ]];then
 	
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
 			exit_code=${job_id};
+			echo "x${exit_code}x"
 		else
 			${average_cmd};
 		fi
@@ -277,4 +278,4 @@ if [[ -f ${output} ]];then
 fi 
 
 
-exit ${exit_code};
+#exit ${exit_code};
