@@ -165,10 +165,10 @@ if (($error_2));then
 		if [[ -d ${work} ]];then
 			echo "Cleaning up completely leftover work directory now...";
 			echo "Removing: ${work}";
-			rm -r $work;
+			rm -fr $work;
 		fi
     fi
-    echo "${humorous_statement}" &&  exit 1;
+    echo "${humorous_statement}" &&  exit 0;
 fi
 
 if [[ ! -d ${work} ]];then
@@ -235,7 +235,7 @@ echo "volume list = ${vol_list}";
 if [[ "x${jid_list}x" == "xx" ]];then
     jid_list=0;
 fi
-exit_code=0;
+
 average_cmd="${ap}AverageImages 3 ${output} 0 ${reassemble_list};";
 if [[ "x${vol_list}x" != "xx" ]];then
     
@@ -243,14 +243,12 @@ if [[ "x${vol_list}x" != "xx" ]];then
 		if ((${cluster}));then
 			job_name="final_averaging_${job_desc}_${runno}_b${bval_1}";
 			# REMOVE 'echo' in rm_cmd after testing!
-			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -r $work;fi;fi;" 
+			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -fr $work;fi;fi;" 
 			final_cmd="${average_cmd}${rm_cmd}";	
 			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
 			job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 	
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
-			exit_code=${job_id};
-			echo "x${exit_code}x"
 		else
 			${average_cmd};
 		fi
@@ -261,7 +259,7 @@ else
     echo "Cleaning up completely useless work directory now...";
     if [[ "x${work}x" != "xx" ]];then
 		if [[ -d ${work} ]];then
-			rm -r $work;
+			rm -fr $work;
 		fi
     fi
 fi
@@ -272,10 +270,24 @@ if [[ -f ${output} ]];then
 		if [[ -d ${work} ]];then
 			echo "Output image appears to successfully persist in time and space."; 
 			echo "Cleaning up temporary work directory now...";
-			rm -r $work;
+			rm -fr $work;
 		fi
     fi
 fi 
 
-
-#exit ${exit_code};
+if ((${cluster}));then
+	re='^[1-9]?[0-9]+$';
+	if [[ ${job_id} =~ $re ]];then
+		exit_status=1;
+	else
+		exit_status=0;
+		echo "FINAL_JOB_ID=${job_id}"
+	fi
+else	
+	if [[ -f ${output} ]];then
+		exit_status=0;
+	else
+		exit_status=1;
+	fi
+fi
+exit "${exit_status}";
