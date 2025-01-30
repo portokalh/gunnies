@@ -318,7 +318,7 @@ if [[ ! -f ${b0} ]];then
 	if [[ ${b0_job_id:0:12} == FINAL_JOB_ID ]];then
 		b0_job_id=${b0_job_id#*\=};
 	else
-		b0_job_id = 0;
+		b0_job_id=0;
 	fi
 	
 fi
