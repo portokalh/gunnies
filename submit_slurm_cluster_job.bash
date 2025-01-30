@@ -57,7 +57,12 @@ echo "#SBATCH --error=${sbatch_folder}/slurm-%j.out" >> ${sbatch_file};
 echo "#SBATCH --job-name=${name}" >> ${sbatch_file};
 echo "#SBATCH --partition=normal" >> ${sbatch_file};
 if [[ "x${hold_jobs}x" != "xx" ]] && [[ "x${hold_jobs}x" != "x0x" ]];then
-    echo "#SBATCH --dependency=afterok:${hold_jobs}" >> ${sbatch_file};
+	# afterok is the default condition for hold jobs. This can cause problems if 
+	# preceding jobs complete before this job can be dispatched. (use 'afterany' instead)
+	if [[ ! ${hold_jobs:0:3} == "aft" &&  ! ${hold_jobs:0:3} == "sin" ]];then
+		hold_jobs="afterok:${hold_jobs}";
+	fi
+    echo "#SBATCH --dependency=${hold_jobs}" >> ${sbatch_file};
 fi
 
 # 25 January 2022, RJA: If things break, look here, where I added the '-e' option

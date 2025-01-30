@@ -346,7 +346,7 @@ if [[ ! -f ${mask} ]];then
 			fi
 			job_name="make_b0_mask_for_${id}";
 			final_cmd="bet ${b0} ${mask%_mask.nii.gz} -m -n;fslmaths ${mask} -add 0 ${mask} -odt \"char\"" 
-			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
+			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  afterany:${jid_list} ${final_cmd}";
 			job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 			echo "Dispatching cluster job to make mask once a B0 image is available:"
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
