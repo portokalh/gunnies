@@ -302,8 +302,13 @@ fi
 
 mask=${work_dir}/${id}_mask.nii.gz;
 if [[ ! -f ${mask} ]];then
-	echo bet ${b0} ${mask} -m -n;
-	bet ${b0} ${mask} -m -n;
+	if [[ -f ${b0} ]];then
+		echo bet ${b0} ${mask} -m -n;
+		bet ${b0} ${mask} -m -n;
+	else
+		echo "NO MASK HAS BEEN PRODUCED--a B0 image is required but not available (yet)."
+		echo "Please consider rerunning this script; it may fix the problem." && exit 1
+	fi
 fi
 echo "The ${proc_name}_${id} pipeline has completed! Thanks for patronizing this wonderful script!" && exit 0
 #######
