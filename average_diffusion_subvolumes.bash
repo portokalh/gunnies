@@ -197,8 +197,7 @@ for bvalue in $(cat $bvals_list);do
        if [[ "x${c_bval}x" != "xx" ]];then
 	   l_bval=$((c_bval-$tolerance));
 	   u_bval=$((c_bval+$tolerance));
-		   if [[ ${bvalue} -lt ${u_bval} ]] && [[ ${bvalue} -gt ${l_bval} ]];then
-				   echo 'checkpoint 1'               
+		   if [[ ${bvalue} -lt ${u_bval} ]] && [[ ${bvalue} -gt ${l_bval} ]];then            
 			   vol_list="${vol_list}${c_vol},";
 			   num_string=$(printf "%03d\n" ${c_vol}); 
 			   vol_xxx_out="${work}/${runno}_m${num_string}.${ext}";
@@ -278,7 +277,7 @@ fi
 if ((${cluster}));then
 	re='^[1-9]?[0-9]+$';
 	if [[ ${job_id} =~ $re ]];then
-		exit_status=0;
+		exit_status=1; #0
 		echo "FINAL_JOB_ID=${job_id}"
 	else
 		exit_status=1;
