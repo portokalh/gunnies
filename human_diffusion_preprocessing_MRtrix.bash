@@ -315,13 +315,11 @@ fi
 if [[ ! -f ${b0} ]];then
 	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
 	b0_job_id=$(export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero} | tail -1);
-	echo "x${b0_job_id}x"
 	if [[ ${b0_job_id:0:12} == FINAL_JOB_ID ]];then
 		b0_job_id=${b0_job_id#*\=};
 	else
 		b0_job_id=0;
 	fi
-		echo "y${b0_job_id}y"
 fi
 
 if [[ -f ${b0} && -f ${dwi} ]];then
@@ -340,9 +338,9 @@ if [[ ! -f ${mask} ]];then
 		fslmaths ${mask} -add 0 ${mask} -odt "char"
 	else
 		if (($cluster));then
-			dep_list='';
+			jid_list='';
 			if ((${b0_job_id}));then
-				dep_list=${b0_job_id};
+				jid_list=${b0_job_id};
 			else
 				shucks=1;
 			fi
