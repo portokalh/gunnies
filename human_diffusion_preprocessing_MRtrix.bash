@@ -15,6 +15,32 @@ if [[ ! -d ${GD} ]];then
 	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
 fi
 
+#Are we on a cluster? Asking for a friend...
+cluster=0;
+SGE_cluster=$(qstat  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
+slurm_cluster=$(sbatch --help  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
+# This returns '1' if NOT on a cluster, so let's reverse that...
+if ((${SGE_cluster} && ${slurm_cluster}));then
+	cluster=0;
+else
+	cluster=1;
+	echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
+	if ((! ${slurm_cluster}));then
+		sub_script=${GUNNIES}/submit_slurm_cluster_job.bash
+		if [[ ! -f ${sub_script} ]];then
+			/mnt/clustertmp/common/rja20_dev/gunnies/submit_slurm_cluster_job.bash
+		fi
+	fi
+	if ((! ${SGE_cluster}));then
+		sub_script=${GUNNIES}/submit_sge_cluster_job.bash
+		if [[ ! -f ${sub_script} ]];then
+			/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash
+		fi
+	fi
+
+fi
+
+
 BD=${BIGGUS_DISKUS}
 if [[ ! -d ${BD} ]];then
 	echo "env variable '$BIGGUS_DISKUS' not defined...failing now..."  && exit 1
@@ -283,12 +309,17 @@ bval_zero=${all_bvals%%\ *};
 
 if [[ ! -f ${dwi} ]];then
 	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
-	#export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
+	export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
 fi
 
 if [[ ! -f ${b0} ]];then
 	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
-	export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
+	b0_job_id=$(export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero} | tail -1);
+	if [[ ${b0_job_id:0:12} == FINAL_JOB_ID ]];then
+		b0_job_id=${b0_job_id#*\=};
+	else
+		b0_job_id = 0;
+	fi
 	
 fi
 
@@ -300,16 +331,37 @@ if [[ -f ${b0} && -f ${dwi} ]];then
 	fi
 fi
 
+shucks=0;
 mask=${work_dir}/${id}_mask.nii.gz;
 if [[ ! -f ${mask} ]];then
 	if [[ -f ${b0} ]];then
-		echo bet ${b0} ${mask} -m -n;
 		bet ${b0} ${mask%_mask.nii.gz} -m -n;
 		fslmaths ${mask} -add 0 ${mask} -odt "char"
 	else
-		echo "NO MASK HAS BEEN PRODUCED--a B0 image is required but not available (yet)."
-		echo "Please consider rerunning this script; it may fix the problem." && exit 1
+		if (($cluster));then
+			dep_list='';
+			if ((${b0_job_id}));then
+				dep_list=${b0_job_id};
+			else
+				shucks=1;
+			fi
+			job_name="make_b0_mask_for_${id}";
+			final_cmd="bet ${b0} ${mask%_mask.nii.gz} -m -n;fslmaths ${mask} -add 0 ${mask} -odt \"char\"" 
+			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
+			job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+			echo "Dispatching cluster job to make mask once a B0 image is available:"
+			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
+		else
+			shucks=1;
+		fi
 	fi
 fi
+
+if (($shucks));then
+	echo "NO MASK HAS BEEN PRODUCED--a B0 image is required but not available."
+	echo "It seems there may have been an error producing the B0 image, but..."	
+	echo "Also try rerunning this script; it may fix the problem." && exit 1
+fi
+
 echo "The ${proc_name}_${id} pipeline has completed! Thanks for patronizing this wonderful script!" && exit 0
 #######
