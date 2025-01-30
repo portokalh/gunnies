@@ -197,31 +197,31 @@ for bvalue in $(cat $bvals_list);do
        if [[ "x${c_bval}x" != "xx" ]];then
 	   l_bval=$((c_bval-$tolerance));
 	   u_bval=$((c_bval+$tolerance));
-	   if [[ ${bvalue} -lt ${u_bval} ]] && [[ ${bvalue} -gt ${l_bval} ]];then
-               echo 'checkpoint 1'               
-	       vol_list="${vol_list}${c_vol},";
-	       num_string=$(printf "%03d\n" ${c_vol}); 
-	       vol_xxx_out="${work}/${runno}_m${num_string}.${ext}";
-	       reassemble_list="${reassemble_list} ${vol_xxx_out} ";
-	       echo "Isolating volume ${c_vol}...";
-	       if [[ ! -e ${vol_xxx_out} ]];then
-		   # Note: I need to make sure $c_vol should be indexed from 0 (vs from 1) for this command
-		   extract_cmd="${ap}ExtractSliceFromImage 4 ${nii4D} ${vol_xxx_out} 3 ${c_vol} 0;";
-		   if ((${cluster}));then
-		       job_name="extract_vol_${c_vol}_from_${runno}";
-		       sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
-		      # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
-		       job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-		       if ((! $?));then
-				jid_list="${jid_list}${job_id},";
-		       fi
-		   else
-		       ${extract_command};
+		   if [[ ${bvalue} -lt ${u_bval} ]] && [[ ${bvalue} -gt ${l_bval} ]];then
+				   echo 'checkpoint 1'               
+			   vol_list="${vol_list}${c_vol},";
+			   num_string=$(printf "%03d\n" ${c_vol}); 
+			   vol_xxx_out="${work}/${runno}_m${num_string}.${ext}";
+			   reassemble_list="${reassemble_list} ${vol_xxx_out} ";
+			   echo "Isolating volume ${c_vol}...";
+			   if [[ ! -e ${vol_xxx_out} ]];then
+			   # Note: I need to make sure $c_vol should be indexed from 0 (vs from 1) for this command
+			   extract_cmd="${ap}ExtractSliceFromImage 4 ${nii4D} ${vol_xxx_out} 3 ${c_vol} 0;";
+				   if ((${cluster}));then
+					   job_name="extract_vol_${c_vol}_from_${runno}";
+					   sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
+					  # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
+					   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+					   if ((! $?));then
+						jid_list="${jid_list}${job_id},";
+					   fi
+				   else
+					   ${extract_command};
+				   fi
+			   fi
+			   c_vol=$((c_vol+1));
+			   continue 2;
 		   fi
-	       fi
-	       c_vol=$((c_vol+1));
-	       continue 2;
-	   fi
        fi
    done
 c_vol=$((c_vol+1));
@@ -235,7 +235,7 @@ echo "volume list = ${vol_list}";
 if [[ "x${jid_list}x" == "xx" ]];then
     jid_list=0;
 fi
-
+exit_code=0;
 average_cmd="${ap}AverageImages 3 ${output} 0 ${reassemble_list};";
 if [[ "x${vol_list}x" != "xx" ]];then
     
@@ -249,6 +249,7 @@ if [[ "x${vol_list}x" != "xx" ]];then
 			job_id=$(${sub_cmd});
 	
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
+			exit_code=${job_id};
 		else
 			${average_cmd};
 		fi
@@ -276,3 +277,4 @@ if [[ -f ${output} ]];then
 fi 
 
 
+exit ${exit_code};

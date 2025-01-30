@@ -283,7 +283,7 @@ bval_zero=${all_bvals%%\ *};
 
 if [[ ! -f ${dwi} ]];then
 	echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
-	export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
+	#export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
 fi
 
 if [[ ! -f ${b0} ]];then
