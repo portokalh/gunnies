@@ -304,7 +304,8 @@ mask=${work_dir}/${id}_mask.nii.gz;
 if [[ ! -f ${mask} ]];then
 	if [[ -f ${b0} ]];then
 		echo bet ${b0} ${mask} -m -n;
-		bet ${b0} ${mask} -m -n;
+		bet ${b0} ${mask%_mask.nii.gz} -m -n;
+		fslmaths ${mask} -add 0 ${mask} -odt "char"
 	else
 		echo "NO MASK HAS BEEN PRODUCED--a B0 image is required but not available (yet)."
 		echo "Please consider rerunning this script; it may fix the problem." && exit 1
