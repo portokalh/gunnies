@@ -246,7 +246,7 @@ if [[ "x${vol_list}x" != "xx" ]];then
 			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -r $work;fi;fi;" 
 			final_cmd="${average_cmd}${rm_cmd}";	
 			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
-			job_id=$(${sub_cmd});
+			job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 	
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
 			exit_code=${job_id};
