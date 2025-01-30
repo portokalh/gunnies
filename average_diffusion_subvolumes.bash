@@ -277,7 +277,7 @@ fi
 if ((${cluster}));then
 	re='^[1-9]?[0-9]+$';
 	if [[ ${job_id} =~ $re ]];then
-		exit_status=1; #0
+		exit_status=0;
 		echo "FINAL_JOB_ID=${job_id}"
 	else
 		exit_status=1;
@@ -289,4 +289,5 @@ else
 		exit_status=1;
 	fi
 fi
+
 exit "${exit_status}";
