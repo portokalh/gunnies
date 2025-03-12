@@ -105,7 +105,11 @@ fi
 
 ## Create temporary header file from reference:
 tmp_header="${ref}.tmp.hdr";
-zless ${ref} | head -c 352 > ${tmp_header};
+
+## The following line can have fatal flaws when used in certain cluster situations.
+#zless ${ref} 1>/dev/null | head -c 352 > ${tmp_header};
+## Using this instead (but untested in Unix):
+gunzip -c ${ref} | dd of=${tmp_header} bs=352 count=1;
 
 ## Copy input data if needed:
 if (( $copy_data ));then

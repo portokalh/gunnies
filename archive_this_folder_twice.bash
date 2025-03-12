@@ -79,8 +79,14 @@ fi
 
 echo "Folder = ${folder}"
 echo "subtype = ${subtype}"
-target_2="alex@samos:/mnt/paros_DB/Projects/${project}/${folder}/${subtype}/";
-target_1="/Volumes/dusom_mousebrains/All_Staff/Projects/${project}/${folder}/${subtype}/";
+
+target_tail="Projects/${project}/${folder}/${subtype}/";
+th_1="archiver@kos:/mnt/newJetStor/paros/paros_DB/";
+th_2="/Volumes/dusom_mousebrains/All_Staff/";
+
+#target_2="alex@samos:/mnt/paros_DB/Projects/${project}/${folder}/${subtype}/";
+target_1="${th_1}${target_tail}";
+target_2="${th_2}${target_tail}";
 
 
 
@@ -114,8 +120,13 @@ if (($debug));then
 fi
 
 #######
+# For now, manually specify which target(s) you want, since the process can be very time-consuming
 
-for target in ${target_2} ${target_1};do
+#target_list="${target_1}";
+target_list="${target_2}";
+#target_list="${target_1} ${target_2}";
+
+for target in ${target_list};do
 t_parent=${target%/*}
 
 if [[ "x${target:0:4}x" == 'x/Volx' ]];then
@@ -129,7 +140,11 @@ else
 fi
 
 timestamp=$(date +%Y%m%d%H%M.%S);
-log="${src}/${project}_${subtype}_${timestamp}_archive.log";
+log_name="${project}_${subtype}_${timestamp}_archive.log";
+log_name=${log_name//\//_};
+
+log=${src}/${log_name}
+
 
 if ((${net_src}));then
 	log=${PWD}/${project}_${subtype}_${timestamp}_archive.log;
