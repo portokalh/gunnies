@@ -110,26 +110,42 @@ if [[ ! -f ${bvecs} ]];then
     bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
     $bvec_cmd;
 fi
-#######
-###
-# 3. --> 1. Convert DWI data to MRtrix format
 
+mrtrix_grad_table="${bvals%.b*}_grad_corrected.b";
+
+#######
 presumed_debiased_stage='05';
 # Add one to presumed_debiased_stage:
 pds_plus_one='06';
 debiased=${work_dir}/${id}_${presumed_debiased_stage}_dwi_nii4D_biascorrected.mif
 if [[ ! -f ${debiased} ]];then
+
+	###
+	# Adding stage 00, checking the gradient table.
+	stage='00';	
+	if [[ ! -e ${mrtrix_grad_table} ]];then	
+		dwigradcheck ${raw_nii} -export_grad_mrtrix ${mrtrix_grad_table};
+	fi
+	
+	if [[ ! -f ${mrtrix_grad_table} ]];then
+		echo "Process died during stage ${stage}" && exit 1;
+	fi
+	
+	###
+	# 3. --> 1. Convert DWI data to MRtrix format
 	stage='01';
 	dwi_mif=${work_dir}/${id}_${stage}_dwi_nii4D.mif;
 	if [[ ! -f ${dwi_mif} ]];then
 		# Moved convert to mif from stage 3 to stage 1
 		#mrconvert ${degibbs} ${dwi_mif} -fslgrad ${bvecs} ${bvals};
-		mrconvert ${raw_nii} ${dwi_mif} -fslgrad ${bvecs} ${bvals};
+		mrconvert ${raw_nii} ${dwi_mif} -grad ${mrtrix_grad_table};
 	fi
 	
 	if [[ ! -f ${dwi_mif} ]];then
 		echo "Process died during stage ${stage}" && exit 1;
 	fi
+	
+	
 	###
 	# 1. --> 2. Denoise the raw DWI data
 	stage='02';
@@ -215,6 +231,19 @@ else
 fi
 
 ###
+# Step 5.5: Generate brain mask
+stage='05.5';
+mask=${work_dir}/${id}_mask.nii.gz;
+if [[ ! -f ${mask} ]];then
+	dwi2mask fslbet ${debiased} ${mask};
+fi
+
+if [[ ! -f ${mask} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
+
+###
 # 6. Fit the tensor model
 stage='06';
 
@@ -222,9 +251,8 @@ strides=${work_dir}/${id}_strides.txt
 if [[ ! -f $strides ]];then
 	mrinfo -strides ${debiased} > $strides;
 fi
-
 dt=${work_dir}/${id}_${stage}_dt.mif;
-if [[ ! -f ${dt} ]];then
+if [[ ! -f ${dt} || ! -f ${b0} ]];then
 	dwi2tensor ${debiased} ${dt};
 fi
 
@@ -282,84 +310,161 @@ done
 
 ###
 # 9. Extract b0 and dwi from debiased nii4D
+stage='09';
 
 b0=${work_dir}/${id}_b0.nii.gz;
 dwi=${work_dir}/${id}_dwi.nii.gz;
 
-mif=${debiased};
-final_nii4D=${debiased/\.mif/\.nii\.gz};
+shells=$(mrinfo -shell_bvalues ${debiased});
+# We remove the first shell, assuming it is the B0 value.
+# shells=${shells#*\ };
+# Trim trailing space.
+shells=${shells%\ };
+
+shellmeans=${work_dir}/${id}_shellmeans.mif;	
 if [[ ! -f ${b0} || ! -f ${dwi} ]];then
-	if [[ ! -f ${final_nii4D} ]];then
-		mrconvert ${mif} ${final_nii4D};
+	if [[ ! -f ${shellmeans} ]]; then
+		dwishellmath ${debiased} mean ${shellmeans};
 	fi
+	
+	i=0;
+	for shelly_long in ${shells};do
+		if (($i));then
+			c_image="${work_dir}/${id}_dwi_b${shelly_long}.nii.gz";
+		else
+			c_image="${work_dir}/${id}_b0.nii.gz";
+		fi	
+		
+		if [[ ! -e ${c_image} ]];then
+			mrconvert ${shellmeans} -coord 3 ${i} -axes 0,1,2 ${c_image};
+		fi
+		let "i++";
+	done
+	
+	dwi_stack_mif="${work_dir}/${id}_dwi_stack.mif";
+	
+	if [[ ! -f ${dwi} ]];then 
+		if [[ $i -eq 2 ]];then
+			mv ${c_image} ${dwi};
+		else
+			if [[ ! -f ${dwi_stack_mif} ]];then
+				s_idc=$(mrinfo -shell_indices ${debiased});
+				s_idc=${s_idc#*\ };
+				s_idc=${s_idc%\ };
+				mrconvert ${debiased} ${dwi_stack_mif} -coord 3 ${s_idc};
+			fi
+			mrmath ${dwi_stack_mif} mean ${dwi} -axis 3;
+			
+			if [[ ! -f ${dwi} ]];then
+				echo "Process died during stage ${stage}" && exit 1;
+			elif ((${cleanup}));then
+				if [[ -f ${dwi_stack_mif} ]];then
+					rm ${dwi_stack_mif};
+				fi
+			fi
+			
+			if [[ ! -f ${b0} ]];then
+				echo "Process died during stage ${stage}" && exit 1;
+			elif ((${cleanup}));then
+				if [[ -f ${shellmeans} ]];then
+					rm ${shellmeans};
+				fi
+			fi
+		fi
+	fi
+fi
+
+if [[ ! -f ${b0} || ! -f ${dwi} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
 elif ((${cleanup}));then
-	if [[ -f  ${final_nii4D} ]];then
-		rm ${final_nii4D};
+	if [[ -f ${shellmeans}; ]];then
+		rm ${shellmeans};;
+	fi
+	if [[ -f ${dwi_stack_mif} ]];then
+		rm ${dwi_stack_mif};
 	fi
 fi
 
-all_bvals=$(mrinfo -shell_bvalues ${debiased} | sort | uniq);
-nominal_bval=${all_bvals#*\ };
-#nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
-#echo $nominal_bval
 
-bval_zero=${all_bvals%%\ *};
-#bval_zero=$(cat ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | head -1);
-#echo $bval_zero
 
-if [[ ! -f ${dwi} ]];then
-	#echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
-	export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
-fi
-
-if [[ ! -f ${b0} ]];then
-	#echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
-	b0_job_id=$(export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero} | tail -1);
-	if [[ ${b0_job_id:0:12} == FINAL_JOB_ID ]];then
-		b0_job_id=${b0_job_id#*\=};
-	else
-		b0_job_id=0;
-	fi
-fi
-
-if [[ -f ${b0} && -f ${dwi} ]];then
-	if ((${cleanup}));then
+if ((0));then
+	mif=${debiased};
+	final_nii4D=${debiased/\.mif/\.nii\.gz};
+	if [[ ! -f ${b0} || ! -f ${dwi} ]];then
+		if [[ ! -f ${final_nii4D} ]];then
+			mrconvert ${mif} ${final_nii4D};
+		fi
+	elif ((${cleanup}));then
 		if [[ -f  ${final_nii4D} ]];then
 			rm ${final_nii4D};
 		fi
 	fi
-fi
-
-shucks=0;
-mask=${work_dir}/${id}_mask.nii.gz;
-if [[ ! -f ${mask} ]];then
-	if [[ -f ${b0} ]];then
-		bet ${b0} ${mask%_mask.nii.gz} -m -n;
-		fslmaths ${mask} -add 0 ${mask} -odt "char"
-	else
-		if (($cluster));then
-			jid_list='';
-			if ((${b0_job_id}));then
-				jid_list=${b0_job_id};
-			else
-				shucks=1;
-			fi
-			job_name="make_b0_mask_for_${id}";
-			final_cmd="bet ${b0} ${mask%_mask.nii.gz} -m -n;fslmaths ${mask} -add 0 ${mask} -odt \"char\"" 
-			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  afterany:${jid_list} ${final_cmd}";
-			job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-			echo "Dispatching cluster job to make mask once a B0 image is available:"
-			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
+	
+	all_bvals=$(mrinfo -shell_bvalues ${debiased} | sort | uniq);
+	nominal_bval=${all_bvals#*\ };
+	#nominal_bval=$(cat ${bvals} $dv | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | tail -1 );
+	#echo $nominal_bval
+	
+	bval_zero=${all_bvals%%\ *};
+	#bval_zero=$(cat ${bvals} | tr -s [:space:] '\n' | sed 's|.*|(&+50)/100*100|' | bc | sort | uniq | tail | tr -s [:space:] '\n' | head -1);
+	#echo $bval_zero
+	
+	if [[ ! -f ${dwi} ]];then
+		#echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
+		export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${dwi} ${nominal_bval};
+	fi
+	
+	if [[ ! -f ${b0} ]];then
+		#echo ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero};
+		b0_job_id=$(export BIGGUS_DISKUS=${work_dir} && ${GD}/average_diffusion_subvolumes.bash ${final_nii4D} $bvals ${b0} ${bval_zero} | tail -1);
+		if [[ ${b0_job_id:0:12} == FINAL_JOB_ID ]];then
+			b0_job_id=${b0_job_id#*\=};
 		else
-			shucks=1;
+			b0_job_id=0;
+		fi
+	fi
+	
+	if [[ -f ${b0} && -f ${dwi} ]];then
+		if ((${cleanup}));then
+			if [[ -f  ${final_nii4D} ]];then
+				rm ${final_nii4D};
+			fi
 		fi
 	fi
 fi
-
-if (($shucks));then
-	echo "NO MASK HAS BEEN PRODUCED--a B0 image is required but not available."
-	echo "It seems there may have been an error producing the B0 image, but..."	
-	echo "Also try rerunning this script; it may fix the problem." && exit 1
+# Original method of producing the mask...
+if ((0));then
+	shucks=0;
+	mask=${work_dir}/${id}_mask.nii.gz;
+	if [[ ! -f ${mask} ]];then
+		if [[ -f ${b0} ]];then
+			bet ${b0} ${mask%_mask.nii.gz} -m -n;
+			fslmaths ${mask} -add 0 ${mask} -odt "char"
+		else
+			if (($cluster));then
+				jid_list='';
+				if ((${b0_job_id}));then
+					jid_list=${b0_job_id};
+				else
+					shucks=1;
+				fi
+				job_name="make_b0_mask_for_${id}";
+				final_cmd="bet ${b0} ${mask%_mask.nii.gz} -m -n;fslmaths ${mask} -add 0 ${mask} -odt \"char\"" 
+				sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  afterany:${jid_list} ${final_cmd}";
+				job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+				echo "Dispatching cluster job to make mask once a B0 image is available:"
+				echo "JOB ID = ${job_id}; Job Name = ${job_name}";
+			else
+				shucks=1;
+			fi
+		fi
+	fi
+	
+	if (($shucks));then
+		echo "NO MASK HAS BEEN PRODUCED--a B0 image is required but not available."
+		echo "It seems there may have been an error producing the B0 image, but..."	
+		echo "Also try rerunning this script; it may fix the problem." && exit 1
+	fi
 fi
 
 echo "The ${proc_name}_${id} pipeline has completed! Thanks for patronizing this wonderful script!" && exit 0
