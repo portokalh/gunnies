@@ -12,7 +12,7 @@ fi
 
 timestamp=$(date +%Y%m%d%H%M.%S);
 job_name=${USER}_${timestamp};
-cmd="${GUNNIES}submit_slurm_cluster_job.bash ${sbatch_dir} ${job_name} 0 0 ${input_cmd}";
+cmd="${GUNNIES}submit_slurm_cluster_job.bash ${sbatch_dir} ${job_name} 20000M 0 ${input_cmd}";
 echo $cmd;
 $cmd;
 
