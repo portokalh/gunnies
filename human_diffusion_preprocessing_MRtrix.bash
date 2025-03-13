@@ -235,7 +235,7 @@ fi
 stage='05.5';
 mask=${work_dir}/${id}_mask.nii.gz;
 if [[ ! -f ${mask} ]];then
-	dwi2mask fslbet ${debiased} ${mask};
+	echo dwi2mask fslbet ${debiased} ${mask};
 fi
 
 if [[ ! -f ${mask} ]];then
