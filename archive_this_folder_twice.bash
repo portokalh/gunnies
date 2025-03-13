@@ -123,8 +123,8 @@ fi
 # For now, manually specify which target(s) you want, since the process can be very time-consuming
 
 #target_list="${target_1}";
-target_list="${target_2}";
-#target_list="${target_1} ${target_2}";
+#target_list="${target_2}";
+target_list="${target_1} ${target_2}";
 
 for target in ${target_list};do
 t_parent=${target%/*}
