@@ -512,35 +512,36 @@ if [[ ! -e ${labels} ]];then
 		echo "SAMBA labels do not exist yet."
 		echo "Please run samba-pipe and backport the labels to this folder." && exit 0;
 	fi
-else
-	parcels_mif=${work_dir}/${id}_IITmean_RPI_parcels.mif.gz;
-	
-	if [[ ! -f ${parcels_mif} ]];then
-		mrconvert ${labels} ${parcels_mif};
-	fi
-		
-	max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
-	
-	if [[ max_label -gt 84 ]];then
-		index2=(8 10 11 12 13 17 18 26 47 49 50 51 52 53 54 58 1001 1002 1003 1005 1006 1007 1008 1009 1010 1011 1012 1013 1014	1015 1016 1017 1018 1019 1020 1021 1022 1023 1024 1025 1026 1027 1028 1029 1030 1031 1032 1033 1034 1035 2001 2002 2003 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027 2028 2029 2030 2031 2032 2033 2034 2035);
-		decomp_parcels=${parcels_mif%\.gz};
-		if [[ ! -f ${decomp_parcels} ]];then
-			gunzip ${parcels_mif};
-		fi 
-	
-		for i in $(seq 1 84);do
-			mrcalc ${decomp_parcels} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
-		done
-		if [[ ! -f ${parcels_mif} ]];then
-			gzip ${decomp_parcels};
-		fi 
-	fi
-	
-	max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
-	if [[ ${max_label} -gt 84 ]];then
-		echo "Process died during stage ${stage}" && exit 1;
-	fi
 fi
+
+parcels_mif=${work_dir}/${id}_IITmean_RPI_parcels.mif.gz;
+
+if [[ ! -f ${parcels_mif} ]];then
+	mrconvert ${labels} ${parcels_mif};
+fi
+	
+max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
+
+if [[ max_label -gt 84 ]];then
+	index2=(8 10 11 12 13 17 18 26 47 49 50 51 52 53 54 58 1001 1002 1003 1005 1006 1007 1008 1009 1010 1011 1012 1013 1014	1015 1016 1017 1018 1019 1020 1021 1022 1023 1024 1025 1026 1027 1028 1029 1030 1031 1032 1033 1034 1035 2001 2002 2003 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027 2028 2029 2030 2031 2032 2033 2034 2035);
+	decomp_parcels=${parcels_mif%\.gz};
+	if [[ ! -f ${decomp_parcels} ]];then
+		gunzip ${parcels_mif};
+	fi 
+
+	for i in $(seq 1 84);do
+		mrcalc ${decomp_parcels} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
+	done
+	if [[ ! -f ${parcels_mif} ]];then
+		gzip ${decomp_parcels};
+	fi 
+fi
+
+max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
+if [[ ${max_label} -gt 84 ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
 
 
 ###
