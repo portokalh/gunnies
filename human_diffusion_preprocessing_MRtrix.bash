@@ -212,7 +212,7 @@ if [[ ! -f ${debiased} ]];then
 		if [[ ${n_shells} -gt 2 ]];then 
 			eddy_opts="${eddy_opts} --data_is_shelled ";
 		fi
-		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 8 ${mask_string};
+		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 10 ${mask_string};
 		#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
 		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 	fi
@@ -295,6 +295,8 @@ if [[ ! -f ${b0} || ! -f ${dwi} ]];then
 				s_idc=$(mrinfo -shell_indices ${debiased});
 				s_idc=${s_idc#*\ };
 				s_idc=${s_idc%\ };
+				s_idc=${s_idc// /,};
+			
 				mrconvert ${debiased} ${dwi_stack_mif} -coord 3 ${s_idc};
 			fi
 			mrmath ${dwi_stack_mif} mean ${dwi} -axis 3;
@@ -462,7 +464,7 @@ tracks_10M_tck=${work_dir}/${id}_tracks_10M.tck;
 smaller_tracks=${work_dir}/${id}_smaller_tracks_2M.tck;
 if [[ ! -f ${smaller_tracks} ]];then
 	if [[ ! -f ${tracks_10M_tck} ]];then
-		tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck} -nthreads 12;
+		tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck} -nthreads 10;
 	fi
 	
 	if [[ ! -f ${tracks_10M_tck} ]];then
@@ -547,7 +549,7 @@ fi
 ###
 # 17. Calculate connectomes
 stage='17';
-conn_folder=${BIGGUS_DISKUS}/../human/${id}_connectomics;
+conn_folder=/mnt/newStor/paros//paros_WORK/ADNI_connectomics/${id}_connectomics;
 if [[ ! -d ${conn_folder} ]];then
 	mkdir ${conn_folder};
 fi
