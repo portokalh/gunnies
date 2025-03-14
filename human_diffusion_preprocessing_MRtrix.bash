@@ -527,7 +527,7 @@ else
 			mrcalc ${decomp_parcels} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
 		done
 		if [[ ! -f ${parcels_mif} ]];then
-			gzip ${decomp_parcels}};
+			gzip ${decomp_parcels};
 		fi 
 	fi
 	
