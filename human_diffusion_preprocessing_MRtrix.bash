@@ -510,6 +510,10 @@ if [[ ! -e ${labels} ]];then
 else
 	parcels_mif=${work_dir}/${id}_IITmean_RPI_parcels.mif.gz;
 	
+	if [[ ! -f ${parcels_mif} ]];then
+		mrconvert ${labels} ${parcels_mif};
+	fi
+		
 	max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
 	
 	if [[ max_label -gt 84 ]];then
