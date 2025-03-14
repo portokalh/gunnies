@@ -124,7 +124,7 @@ if [[ ! -f ${debiased} ]];then
 	# Adding stage 00, checking the gradient table.
 	stage='00';	
 	if [[ ! -e ${mrtrix_grad_table} ]];then	
-		dwigradcheck ${raw_nii} -export_grad_mrtrix ${mrtrix_grad_table};
+		dwigradcheck ${raw_nii} -fslgrad ${bvecs} ${bvals} -export_grad_mrtrix ${mrtrix_grad_table};
 	fi
 	
 	if [[ ! -f ${mrtrix_grad_table} ]];then
