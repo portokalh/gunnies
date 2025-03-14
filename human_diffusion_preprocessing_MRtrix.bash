@@ -504,9 +504,13 @@ stage='16';
 labels=${work_dir}/${id}_IITmean_RPI_labels.nii.gz;
 
 if [[ ! -e ${labels} ]];then
-	echo "Process stopped at ${stage}.";
-	echo "SAMBA labels do not exist yet."
-	echo "Please run samba-pipe and backport the labels to this folder." && exit 0;
+	source_labels=${BIGGUS_DISKUS}/VBM_25ADNI01_IITmean_RPI-results/connectomics/${id}/${id}_IITmean_RPI_labels.nii.gz;
+	cp ${source_labels ${labels};
+	if [[ ! -e ${labels} ]];then
+		echo "Process stopped at ${stage}.";
+		echo "SAMBA labels do not exist yet."
+		echo "Please run samba-pipe and backport the labels to this folder." && exit 0;
+	fi
 else
 	parcels_mif=${work_dir}/${id}_IITmean_RPI_parcels.mif.gz;
 	
