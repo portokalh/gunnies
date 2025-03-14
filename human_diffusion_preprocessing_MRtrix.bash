@@ -505,7 +505,7 @@ stage='16';
 labels=${work_dir}/${id}_IITmean_RPI_labels.nii.gz;
 
 if [[ ! -e ${labels} ]];then
-	source_labels=${BIGGUS_DISKUS}/VBM_25ADNI01_IITmean_RPI-results/connectomics/${id}/${id}_IITmean_RPI_labels.nii.gz;
+	source_labels=${BIGGUS_DISKUS}/../mouse/VBM_25ADNI01_IITmean_RPI-results/connectomics/${id}/${id}_IITmean_RPI_labels.nii.gz;
 	cp ${source_labels} ${labels};
 	if [[ ! -e ${labels} ]];then
 		echo "Process stopped at ${stage}.";
