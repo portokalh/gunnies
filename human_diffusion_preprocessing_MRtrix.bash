@@ -459,7 +459,7 @@ fi
 stage='13';
 tracks_10M_tck=${work_dir}/${id}_tracks_10M.tck;
 if [[ ! -f ${tracks_10M_tck} ]];then
-	tckgen -backtrack -seed_image ${gmwmSeed_coreg_mi} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck};
+	tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck};
 fi
 
 if [[ ! -f ${tracks_10M_tck} ]];then
