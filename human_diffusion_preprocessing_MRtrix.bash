@@ -552,7 +552,7 @@ mean_FA_per_streamline=${conn_folder}/${id}_per_strmline_mean_FA.csv;
 
 
 if [[ ! -f ${mean_FA_per_streamline} ]];then
-	tcksample smaller_tracks+ ${fa} ${mean_FA_per_streamline} -stat_tck mean;
+	tcksample ${smaller_tracks} ${fa} ${mean_FA_per_streamline} -stat_tck mean;
 fi
 
 mean_FA_connectome=${conn_folder}/${id}_mean_FA_connectome.csv;
