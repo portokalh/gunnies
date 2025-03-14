@@ -458,23 +458,27 @@ fi
 # 13. Creating streamlines with tckgen
 stage='13';
 tracks_10M_tck=${work_dir}/${id}_tracks_10M.tck;
-if [[ ! -f ${tracks_10M_tck} ]];then
-	tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck} -nthreads 12;
-fi
-
-if [[ ! -f ${tracks_10M_tck} ]];then
-	echo "Process died during stage ${stage}" && exit 1;
-fi
-
-###
-# 14. Extracting a subset of tracks.
 smaller_tracks=${work_dir}/${id}_smaller_tracks_2M.tck;
 if [[ ! -f ${smaller_tracks} ]];then
+	if [[ ! -f ${tracks_10M_tck} ]];then
+		tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck} -nthreads 12;
+	fi
+	
+	if [[ ! -f ${tracks_10M_tck} ]];then
+		echo "Process died during stage ${stage}" && exit 1;
+	fi
+	###
+	# 14. Extracting a subset of tracks.
+	stage='14';
 	tckedit ${tracks_10M_tck} -number 2000000 -minlength 0.1 ${smaller_tracks};
 fi
 
 if [[ ! -f ${smaller_tracks} ]];then
 	echo "Process died during stage ${stage}" && exit 1;
+elif ((${cleanup}));then
+	if [[ -f ${tracks_10M_tck}  ]];then
+		rm ${tracks_10M_tck};
+	fi
 fi
 
 
@@ -491,6 +495,93 @@ fi
 
 if [[ ! -f  ${sift_mu_txt} || ! -f ${sift_coeffs_txt} || ! -f ${sift_1M_txt} ]];then
 	echo "Process died during stage ${stage}" && exit 1;
+fi
+
+###
+# 16. Convert and remap IIT labels
+stage='16';
+
+labels=${work_dir}/${id}_IITmean_RPI_labels.nii.gz;
+
+if [[ ! -e ${labels} ]];then
+	echo "Process stopped at ${stage}.";
+	echo "SAMBA labels do not exist yet."
+	echo "Please run samba-pipe and backport the labels to this folder." && exit 0;
+else
+	parcels_mif=${work_dir}/${id}_IITmean_RPI_parcels.mif.gz;
+	
+	max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
+	
+	if [[ max_label -gt 84 ]];then
+		index2=(8 10 11 12 13 17 18 26 47 49 50 51 52 53 54 58 1001 1002 1003 1005 1006 1007 1008 1009 1010 1011 1012 1013 1014	1015 1016 1017 1018 1019 1020 1021 1022 1023 1024 1025 1026 1027 1028 1029 1030 1031 1032 1033 1034 1035 2001 2002 2003 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025 2026 2027 2028 2029 2030 2031 2032 2033 2034 2035);
+		decomp_parcels=${parcels_mif%\.gz};
+		if [[ ! -f ${decomp_parcels} ]];then
+			gunzip ${parcels_mif};
+		fi 
+	
+		for i in $(seq 1 84);do
+			mrcalc ${decomp_parcels_mif} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
+		done
+		if [[ ! -f ${parcels_mif} ]];then
+			gzip ${decomp_parcels}};
+		fi 
+	fi
+	
+	max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
+	if [[ ${max_label} -gt 84 ]];then
+		echo "Process died during stage ${stage}" && exit 1;
+	fi
+fi
+
+
+###
+# 17. Calculate connectomes
+stage='17';
+conn_folder=${BIGGUS_DISKUS}/../human/${id}_connectomics;
+if [[ ! -d ${conn_folder} ]];then
+	mkdir ${conn_folder};
+fi
+
+distances_csv=${conn_folder}/${id}_distances.csv;
+if [[ ! -f ${distances_csv} ]];then
+	tck2connectome ${smaller_tracks} ${parcels_mif} ${distances_csv} -zero_diagonal -symmetric -scale_length -stat_edge  mean;
+fi
+
+
+mean_FA_per_streamline=${conn_folder}/${id}_per_strmline_mean_FA.csv;
+
+
+if [[ ! -f ${mean_FA_per_streamline} ]];then
+	tcksample smaller_tracks+ ${fa} ${mean_FA_per_streamline} -stat_tck mean;
+fi
+
+mean_FA_connectome=${conn_folder}/${id}_mean_FA_connectome.csv;
+if [[ ! -f ${mean_FA_connectome} ]];then
+	tck2connectome ${smaller_tracks} ${parcels_mif} ${mean_FA_connectome} -zero_diagonal -symmetric -scale_file ${mean_FA_per_streamline} -stat_edge mean;
+fi
+
+
+
+###
+# 18.
+stage='18';
+
+# I think we decided we didn't want/need this first flavor
+#parcels_csv=${conn_folder}/${id}_conn_sift_node.csv;
+#assignments_parcels_csv=${conn_folder}/${id}_assignments_con_sift_node.csv;
+#os.system('tck2connectome -symmetric -zero_diagonal -scale_invnodevol -tck_weights_in '+ sift_1M_txt+ ' '+ smallerTracks + ' '+ parcels_mif + ' '+ parcels_csv + ' -out_assignment ' + assignments_parcels_csv + ' -force')
+
+
+parcels_csv_2=${conn_folder}/${id}_onn_plain.csv;
+assignments_parcels_csv2=${conn_folder}/${id}_assignments_con_plain.csv;
+if [[ ! -f ${parcels_csv_2} ||  ! -f ${assignments_parcels_csv2} ]];then
+	tck2connectome -symmetric -zero_diagonal ${smaller_tracks} ${parcels_mif} ${parcels_csv_2} -out_assignment ${assignments_parcels_csv2} -force;
+fi
+
+parcels_csv_3=${conn_folder}/${id}_onn_sift.csv;
+assignments_parcels_csv3=${conn_folder}/${id}_assignments_con_sift.csv;
+if [[ ! -f ${parcels_csv_3} ||  ! -f ${assignments_parcels_csv3} ]];then
+	tck2connectome -symmetric -zero_diagonal -tck_weights_in ${sift_1M_txt} ${smaller_tracks} ${parcels_mif} ${parcels_csv_3} -out_assignment ${assignments_parcels_csv3} -force;
 fi
 
 
