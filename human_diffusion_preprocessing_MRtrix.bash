@@ -524,7 +524,7 @@ else
 		fi 
 	
 		for i in $(seq 1 84);do
-			mrcalc ${decomp_parcels_mif} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
+			mrcalc ${decomp_parcels} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
 		done
 		if [[ ! -f ${parcels_mif} ]];then
 			gzip ${decomp_parcels}};
