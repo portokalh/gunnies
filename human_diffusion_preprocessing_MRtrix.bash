@@ -185,7 +185,20 @@ if [[ ! -f ${debiased} ]];then
 	# 4. Perform motion and eddy current correction (requires FSL's `eddy`)
 	stage='04'
 	preprocessed=${work_dir}/${id}_${stage}_dwi_nii4D_preprocessed.mif;
+	temp_mask=${work_dir}/${id}_mask_tmp.mif;
 	if [[ ! -f ${preprocessed} ]];then
+		
+		# Going to make a temporary mask with dwi2mask, but use fsl's bet later from the b0
+		
+		if [[ ! -f ${tmp_mask} ]];then
+			dwi2mask ${degibbs} ${temp_mask};
+		fi
+		
+		mask_string=' ';
+		if [[ -f ${tmp_mask} ]];then
+			mask_string=" -mask ${temp_mask} ";
+		fi
+
 		# Moved around first 3 steps; updating accordingly:
 		# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
 		json_string=" -pe_dir AP ";
@@ -199,7 +212,7 @@ if [[ ! -f ${debiased} ]];then
 		if [[ ${n_shells} -gt 2 ]];then 
 			eddy_opts="${eddy_opts} --data_is_shelled ";
 		fi
-		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 8
+		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 8 ${mask_string};
 		#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
 		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 	fi
@@ -215,6 +228,10 @@ if [[ ! -f ${debiased} ]];then
 	# 5. Bias field correction (optional but recommended)
 	stage='05';
 	debiased=${work_dir}/${id}_${stage}_dwi_nii4D_biascorrected.mif
+	mask_string=' ';
+	if [[ -f ${tmp_mask} ]];then
+		mask_string=" -mask ${temp_mask} ";
+	fi
 	if [[ ! -f ${debiased} ]];then
 		dwibiascorrect ants ${preprocessed} ${debiased} -scratch ${work_dir}/
 	fi
@@ -230,87 +247,10 @@ else
 	echo "Debiased mif file already exists; skipping to Stage ${pds_plus_one}." 
 fi
 
-###
-# Step 5.5: Generate brain mask
-stage='05.5';
-mask=${work_dir}/${id}_mask.nii.gz;
-if [[ ! -f ${mask} ]];then
-	echo dwi2mask fslbet ${debiased} ${mask};
-fi
-
-if [[ ! -f ${mask} ]];then
-	echo "Process died during stage ${stage}" && exit 1;
-fi
-
 
 ###
-# 6. Fit the tensor model
+# 6. Extract b0 and dwi from debiased nii4D
 stage='06';
-
-strides=${work_dir}/${id}_strides.txt
-if [[ ! -f $strides ]];then
-	mrinfo -strides ${debiased} > $strides;
-fi
-dt=${work_dir}/${id}_${stage}_dt.mif;
-if [[ ! -f ${dt} || ! -f ${b0} ]];then
-	dwi2tensor ${debiased} ${dt};
-fi
-
-if [[ ! -f ${dt} ]];then
-	echo "Process died during stage ${stage}" && exit 1;
-fi
-###
-# 7. Compute FA (and other metrics, if desired)
-stage='07';
-fa=${work_dir}/${id}_${stage}_fa.mif;
-fa_nii=${work_dir}/${id}_fa.nii.gz;
-adc=${work_dir}/${id}_${stage}_adc.mif;
-adc_nii=${work_dir}/${id}_adc.nii.gz;
-rd=${work_dir}/${id}_${stage}_rd.mif;
-rd_nii=${work_dir}/${id}_rd.nii.gz;
-ad=${work_dir}/${id}_${stage}_ad.mif;
-ad_nii=${work_dir}/${id}_ad.nii.gz;
-out_string=" ";
-
-if [[ ! -f ${fa_nii} || ! -f ${adc_nii} || ! -f ${rd_nii} || ! -f ${ad_nii} ]];then
-
-	if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
-		for contrast in fa adc rd ad;do
-			c_mif=${work_dir}/${id}_${stage}_${contrast}.mif;
-			nii=${work_dir}/${id}_${contrast}.nii.gz;
-			if [[ ! -f ${nii} && ! -f ${c_mif} ]];then
-				out_string="${out_string} -${contrast} ${c_mif}"
-			fi
-		done
-		tensor2metric ${dt} ${out_string};
-	fi
-
-	if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
-		echo "Process died during stage ${stage}" && exit 1;
-	fi
-fi
-
-###
-# 8. Convert FA (or other metrics) to NIfTI for visualization
-for contrast in fa adc rd ad;do
-	mif=${work_dir}/${id}_${stage}_${contrast}.mif;
-	nii=${work_dir}/${id}_${contrast}.nii.gz;
-	
-	if [[ ! -f ${nii} ]];then
-		mrconvert ${mif} ${nii};
-	fi
-	
-	if [[ -f ${nii} && -f ${mif} ]];then
-		if ((${cleanup}));then
-			rm ${mif};
-		fi
-	fi
-done
-
-
-###
-# 9. Extract b0 and dwi from debiased nii4D
-stage='09';
 
 b0=${work_dir}/${id}_b0.nii.gz;
 dwi=${work_dir}/${id}_dwi.nii.gz;
@@ -384,6 +324,108 @@ elif ((${cleanup}));then
 		rm ${dwi_stack_mif};
 	fi
 fi
+
+
+# With b0 in hand, generate a mask with fsl's bet:
+mask=${work_dir}/${id}_mask.nii.gz;
+if [[ ! -f ${mask} ]];then
+	if [[ -f ${b0} ]];then
+		bet ${b0} ${mask%_mask.nii.gz} -m -n;
+		fslmaths ${mask} -add 0 ${mask} -odt "char";
+	fi
+fi
+
+if [[ ! -f ${mask} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
+
+
+###
+# 7. Fit the tensor model
+stage='07';
+
+strides=${work_dir}/${id}_strides.txt
+if [[ ! -f $strides ]];then
+	mrinfo -strides ${debiased} > $strides;
+fi
+dt=${work_dir}/${id}_${stage}_dt.mif;
+if [[ ! -f ${dt} || ! -f ${b0} ]];then
+	dwi2tensor ${debiased} ${dt} -mask ${mask};
+fi
+
+if [[ ! -f ${dt} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+###
+# 8. Compute FA (and other metrics, if desired)
+stage='08';
+fa=${work_dir}/${id}_${stage}_fa.mif;
+fa_nii=${work_dir}/${id}_fa.nii.gz;
+adc=${work_dir}/${id}_${stage}_adc.mif;
+adc_nii=${work_dir}/${id}_adc.nii.gz;
+rd=${work_dir}/${id}_${stage}_rd.mif;
+rd_nii=${work_dir}/${id}_rd.nii.gz;
+ad=${work_dir}/${id}_${stage}_ad.mif;
+ad_nii=${work_dir}/${id}_ad.nii.gz;
+out_string=" ";
+
+if [[ ! -f ${fa_nii} || ! -f ${adc_nii} || ! -f ${rd_nii} || ! -f ${ad_nii} ]];then
+
+	if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
+		for contrast in fa adc rd ad;do
+			c_mif=${work_dir}/${id}_${stage}_${contrast}.mif;
+			nii=${work_dir}/${id}_${contrast}.nii.gz;
+			if [[ ! -f ${nii} && ! -f ${c_mif} ]];then
+				out_string="${out_string} -${contrast} ${c_mif}"
+			fi
+		done
+		tensor2metric ${dt} ${out_string};
+	fi
+
+	if [[ ! -f ${fa} || ! -f ${adc} || ! -f ${rd} || ! -f ${ad} ]];then
+		echo "Process died during stage ${stage}" && exit 1;
+	fi
+fi
+
+###
+# 9. Convert FA (or other metrics) to NIfTI for visualization
+for contrast in fa adc rd ad;do
+	mif=${work_dir}/${id}_${stage}_${contrast}.mif;
+	nii=${work_dir}/${id}_${contrast}.nii.gz;
+	
+	if [[ ! -f ${nii} ]];then
+		mrconvert ${mif} ${nii};
+	fi
+	
+	if [[ -f ${nii} && -f ${mif} ]];then
+		if ((${cleanup}));then
+			rm ${mif};
+		fi
+	fi
+done
+
+
+###
+# 10. Calculate response functions
+stage='10';
+wm_txt=${work_dir}/${id}_wm.txt;
+gm_txt=${work_dir}/${id}_gm.txt;
+csf_txt=${work_dir}/${id}_csf.txt;
+voxels_mif=${work_dir}/${id}_voxels.mif.gz
+
+if [[ ! -f ${wm_txt} || ! -f ${gm_txt} || ! -f ${csf_txt} || ! -f ${voxels_mif} ]];then
+	dwi2response dhollander ${debiased} ${wm_txt} ${gm_txt} ${csf_txt} -voxels ${voxels_mif} -mask ${mask} -scratch ${work_dir};
+fi
+
+if [[ ! -f ${wm_txt} || ! -f ${gm_txt} || ! -f ${csf_txt} || ! -f ${voxels_mif} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
+###
+# 11.
+stage='11';
+
 
 
 
