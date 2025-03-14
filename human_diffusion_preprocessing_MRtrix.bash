@@ -483,7 +483,18 @@ elif ((${cleanup}));then
 		rm ${tracks_10M_tck};
 	fi
 fi
+###
+# 14.5 Further reducing tracks solely for QA visualization purpose.
+stage=14.5;
+QA_tracks=${work_dir}/${id}_QA_tracks_50k.tck;
+if [[ ! -f ${QA_tracks} ]];then
+	tckedit ${smaller_tracks} ${QA_tracks} -number 50000 -nthreads 10;
+fi
 
+if [[ ! -f ${QA_tracks} ]];then
+	echo "NON-CRITICAL FAILURE: no QA_tracks were produced during stage ${stage}." ;
+	echo "   Missing file: ${QA_tracks} ." ;
+fi
 
 ###
 # 15. Sifting the tracks with tcksift2: bc some wm tracks are over or underfitted
