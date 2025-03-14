@@ -317,8 +317,8 @@ fi
 if [[ ! -f ${b0} || ! -f ${dwi} ]];then
 	echo "Process died during stage ${stage}" && exit 1;
 elif ((${cleanup}));then
-	if [[ -f ${shellmeans}; ]];then
-		rm ${shellmeans};;
+	if [[ -f ${shellmeans} ]];then
+		rm ${shellmeans};
 	fi
 	if [[ -f ${dwi_stack_mif} ]];then
 		rm ${dwi_stack_mif};
