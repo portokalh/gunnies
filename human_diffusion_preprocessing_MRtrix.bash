@@ -459,12 +459,40 @@ fi
 stage='13';
 tracks_10M_tck=${work_dir}/${id}_tracks_10M.tck;
 if [[ ! -f ${tracks_10M_tck} ]];then
-	tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck};
+	tckgen -backtrack -seed_image ${mask} -maxlength 1000 -cutoff 0.1 -select 10000000 ${wmfod_norm_mif} ${tracks_10M_tck} -nthreads 12;
 fi
 
 if [[ ! -f ${tracks_10M_tck} ]];then
 	echo "Process died during stage ${stage}" && exit 1;
 fi
+
+###
+# 14. Extracting a subset of tracks.
+smaller_tracks=${work_dir}/${id}_smaller_tracks_2M.tck;
+if [[ ! -f ${smaller_tracks} ]];then
+	tckedit ${tracks_10M_tck} -number 2000000 -minlength 0.1 ${smaller_tracks};
+fi
+
+if [[ ! -f ${smaller_tracks} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
+
+###
+# 15. Sifting the tracks with tcksift2: bc some wm tracks are over or underfitted
+stage='15';
+sift_mu_txt=${work_dir}/${id}_sift_mu.txt;
+sift_coeffs_txt=${work_dir}/${id}_sift_coeffs.txt;
+sift_1M_txt=${work_dir}/${id}_sift_1M.txt;
+
+if [[ ! -f  ${sift_mu_txt} || ! -f ${sift_coeffs_txt} || ! -f ${sift_1M_txt} ]];then
+	tcksift2  -out_mu ${sift_mu_txt} -out_coeffs ${sift_coeffs_txt} ${smaller_tracks} ${wmfod_norm_mif} ${sift_1M_txt} ;
+fi
+
+if [[ ! -f  ${sift_mu_txt} || ! -f ${sift_coeffs_txt} || ! -f ${sift_1M_txt} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
 
 if ((0));then
 	mif=${debiased};
