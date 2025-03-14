@@ -242,6 +242,10 @@ if [[ ! -f ${debiased} ]];then
 		if [[ -f ${preprocessed} ]];then
 			rm ${preprocessed};
 		fi
+		
+		if [[ -f ${temp_mask} ]];then
+			rm ${temp_mask};
+		fi
 	fi
 else
 	echo "Debiased mif file already exists; skipping to Stage ${pds_plus_one}." 
@@ -407,7 +411,7 @@ done
 
 
 ###
-# 10. Calculate response functions
+# 10. Estimating the response functions
 stage='10';
 wm_txt=${work_dir}/${id}_wm.txt;
 gm_txt=${work_dir}/${id}_gm.txt;
@@ -423,11 +427,36 @@ if [[ ! -f ${wm_txt} || ! -f ${gm_txt} || ! -f ${csf_txt} || ! -f ${voxels_mif} 
 fi
 
 ###
-# 11.
+# 11. Applying the basis functions to the diffusion data:
 stage='11';
+wmfod_mif=${work_dir}/${id}_wmfod.mif.gz;
+gmfod_mif=${work_dir}/${id}_gmfod.mif.gz;
+csffod_mif=${work_dir}/${id}_csffod.mif.gz;
 
+if [[ ! -f ${wmfod_mif} ]];then
+	dwi2fod msmt_csd ${debiased} -mask ${mask} ${wm_txt} ${wmfod_mif};
+fi
 
+if [[ ! -f ${wmfod_mif} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
 
+###
+# 12. Normalize the FODs:
+wmfod_norm_mif=${work_dir}/${id}_wmfod_norm.mif.gz
+#gmfod_norm_mif=${work_dir}/${id}_gmfod_norm.mif.gz
+#csffod_norm_mif=${work_dir}/${id}_csffod_norm.mif,gz  
+if [[ ! -f ${wmfod_norm_mif} ]];then
+	mtnormalise ${wmfod_mif} ${wmfod_norm_mif} -mask ${mask};
+fi
+
+if [[ ! -f ${wmfod_norm_mif} ]];then
+	echo "Process died during stage ${stage}" && exit 1;
+fi
+
+###
+# 13.
+stage='13';
 
 if ((0));then
 	mif=${debiased};
