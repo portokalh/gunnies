@@ -221,7 +221,7 @@ if ((${jid_list}));then
 else
     jid_list='0';
 fi
-echo "Debug point 69"
+
 return_code=0;
 reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ƒ}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
@@ -257,7 +257,7 @@ if [[ "x${dti}x" == "x1x" ]];then
 	$dsi_bvec_cmd;
     fi
 fi
-echo "Debug point 6900"
+
 echo ${return_code} && exit ${return_code};
 
 
