@@ -218,6 +218,7 @@ if [[ ! -f ${debiased} ]];then
 			# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 		else
 			coreg_nii="${BIGGUS_DISKUS}/co_reg_${id}_m00-results/Reg_${id}_nii4D.nii.gz";
+			echo " Coreg _nii = ${coreg_nii}"
 			degibbs_nii=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
 			
 			if [[ ! -f ${degibbs_nii} && ! -f ${coreg_nii} ]];then
@@ -233,9 +234,10 @@ if [[ ! -f ${debiased} ]];then
 			if [[ $cluster ]];then
 				t=30;
 				echo "Checkpoint 6900"
+				test=1;
 				while (($test));do
 					if [[ $cluster -eq 1 ]];then
-						test=$(squeue -h -j $jid 2>/dev/null | wc -l)
+						test=$(squeue -h -j $jid 2>/dev/null | wc -l);
 					else
 						# The following test will also work for comma-separated job list, returning the list of
 						# jobs currently running.
