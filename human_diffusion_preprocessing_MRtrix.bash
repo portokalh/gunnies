@@ -236,12 +236,14 @@ if [[ ! -f ${debiased} ]];then
 				echo "Checkpoint 6900"
 				test=1;
 				while (($test));do
-				echo "Checkpoint 690009"
+				
 					if [[ $cluster -eq 1 ]];then
 						test=$(squeue -h -j $jid 2>/dev/null | wc -l);
+						echo "Checkpoint 690009"
 					else
 						# The following test will also work for comma-separated job list, returning the list of
 						# jobs currently running.
+						echo "Checkpoint 690348t384t"
 						test=$(qstat | grep -E ${jid//,/\|} 2>/dev/null | wc -l);
 					fi
 					echo '.';
