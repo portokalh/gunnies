@@ -207,7 +207,7 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
 		if [[ ${cluster} -eq 1 ]];then
 			job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-		elif [[ ${cluster} -eq 2 ]]
+		elif [[ ${cluster} -eq 2 ]];then
 		   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 		fi	
 						
@@ -234,7 +234,7 @@ if [[ ! -f ${reg_nii4D} ]];then
     echo ${sub_cmd};
 	if [[ ${cluster} -eq 1 ]];then
 		job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-	elif [[ ${cluster} -eq 2 ]]
+	elif [[ ${cluster} -eq 2 ]];then
 	   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 	fi	
 						

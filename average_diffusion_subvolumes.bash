@@ -204,7 +204,7 @@ for bvalue in $(cat $bvals_list);do
 					  # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
 						if [[ ${cluster} -eq 1 ]];then
 							job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-						elif [[ ${cluster} -eq 2 ]]
+						elif [[ ${cluster} -eq 2 ]];then
 						   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 						fi	
 						
@@ -244,7 +244,7 @@ if [[ "x${vol_list}x" != "xx" ]];then
 			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
 			if [[ ${cluster} -eq 1 ]];then
 				job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-			elif [[ ${cluster} -eq 2 ]]
+			elif [[ ${cluster} -eq 2 ]];then
 			   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 			fi	
 						
