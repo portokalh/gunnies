@@ -232,7 +232,7 @@ if [[ ! -f ${debiased} ]];then
 			fi
 
 			if [[ ! -f ${coreg_nii} ]];then
-				/mnt/clustertmp/common/rja20_dev/gunnies/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0;
+				${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0;
 			fi
 			
 			mrconvert ${coreg_nii} ${preprocessed};
