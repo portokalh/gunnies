@@ -206,7 +206,7 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	   
 	    final_cmd="${reg_cmd};${apply_cmd}";	
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
-	    if [[ $num_string -eqw '01' ]];then
+	    if [[ $num_string -eq '01' ]];then
 		    echo ${sub_cmd}; # Temp for Debugging
 		fi
 		if [[ ${cluster} -eq 1 ]];then
