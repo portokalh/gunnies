@@ -50,10 +50,10 @@ bval_4=$7;
 cluster=$(bash cluster_test.bash);
 if [[ $cluster ]];then
     echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
-    if [[ ${cluster} == 'SLURM' ]];then
+    if [[ ${cluster} -eq 1 ]];then
 		sub_script=${GUNNIES}/submit_slurm_cluster_job.bash;
 	fi
-    if [[ ${cluster} == 'SGE' ]];then
+    if [[ ${cluster} -eq 2 ]];then
 		sub_script=${GUNNIES}/submit_sge_cluster_job.bash
 	fi
 fi
@@ -202,10 +202,10 @@ for bvalue in $(cat $bvals_list);do
 					   job_name="extract_vol_${c_vol}_from_${runno}";
 					   sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
 					  # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
-						if [[ ${cluster} == 'SGE' ]];then
+						if [[ ${cluster} -eq 1 ]];then
+							job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
+						elif [[ ${cluster} -eq 2 ]]
 						   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-						else
-						   job_id=$(${sub_cmd} | cut -d ' ' -f 4);
 						fi	
 						
 						if ((! $?));then
@@ -242,11 +242,12 @@ if [[ "x${vol_list}x" != "xx" ]];then
 			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -fr $work;fi;fi;" 
 			final_cmd="${average_cmd}${rm_cmd}";	
 			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
-			if [[ ${cluster} == 'SGE' ]];then
+			if [[ ${cluster} -eq 1 ]];then
+				job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
+			elif [[ ${cluster} -eq 2 ]]
 			   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-			else
-			   job_id=$(${sub_cmd} | cut -d ' ' -f 4);
-			fi
+			fi	
+						
 	
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
 		else
