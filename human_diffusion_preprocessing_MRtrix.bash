@@ -233,10 +233,9 @@ if [[ ! -f ${debiased} ]];then
 			if [[ ! -f ${coreg_nii} ]];then
 				jid=$(${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0);
 				echo "Last coregistration job id is ${jid}";
-				echo "Checkpoint 69"
 			fi
 			echo "Checkpoint 690"
-			if [[ $cluster ]];then
+			if [[ $cluster && $jid ]];then
 				t=30;
 				echo "Checkpoint 6900"
 				test=1;
