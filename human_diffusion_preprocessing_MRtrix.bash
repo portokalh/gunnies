@@ -245,6 +245,7 @@ if [[ ! -f ${debiased} ]];then
 						test=$(qstat | grep -E ${jid//,/\|} 2>/dev/null | wc -l);
 					fi
 					echo '.';
+					echo $test;
 					sleep 15;
 					let "t--";
 				done	
