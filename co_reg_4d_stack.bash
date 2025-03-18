@@ -206,6 +206,7 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	   
 	    final_cmd="${reg_cmd};${apply_cmd}";	
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
+	    echo ${sub_cmd}; # Temp for Debugging
 		if [[ ${cluster} -eq 1 ]];then
 			job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
 		elif [[ ${cluster} -eq 2 ]];then
