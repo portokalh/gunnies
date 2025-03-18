@@ -223,7 +223,7 @@ else
 fi
 echo "Debug point 69"
 return_code=0;
-reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ext}";
+reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ƒ}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
 if [[ ! -f ${reg_nii4D} ]];then
@@ -257,7 +257,7 @@ if [[ "x${dti}x" == "x1x" ]];then
 	$dsi_bvec_cmd;
     fi
 fi
-
+echo "Debug point 6900"
 echo ${return_code} && exit ${return_code};
 
 
