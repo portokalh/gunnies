@@ -228,7 +228,7 @@ if [[ ! -f ${debiased} ]];then
 			coreg_nii="${BIGGUS_DISKUS}/co_reg_${id}_m00-results/Reg_${id}_nii4D.nii.gz";
 			degibbs_nii=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
 			
-			if [[ ! -f ${degibbs_nii } && ! -f ${coreg_nii} ]];then
+			if [[ ! -f ${degibbs_nii} && ! -f ${coreg_nii} ]];then
 				mrconvert ${degibbs} ${degibbs_nii};
 			fi
 
