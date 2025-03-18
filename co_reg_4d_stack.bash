@@ -206,7 +206,9 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	   
 	    final_cmd="${reg_cmd};${apply_cmd}";	
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
-	    echo ${sub_cmd}; # Temp for Debugging
+	    if [[ $num_string -eqw '01' ]];then
+		    echo ${sub_cmd}; # Temp for Debugging
+		fi
 		if [[ ${cluster} -eq 1 ]];then
 			job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
 		elif [[ ${cluster} -eq 2 ]];then
@@ -233,7 +235,7 @@ assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reas
 if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
     sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
-    echo ${sub_cmd};
+    
 	if [[ ${cluster} -eq 1 ]];then
 		job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
 	elif [[ ${cluster} -eq 2 ]];then
