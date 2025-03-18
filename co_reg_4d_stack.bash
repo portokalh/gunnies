@@ -223,7 +223,7 @@ else
 fi
 
 return_code=0;
-reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ƒ}";
+reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ext}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
 if [[ ! -f ${reg_nii4D} ]];then

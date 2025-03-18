@@ -217,7 +217,7 @@ if [[ ! -f ${debiased} ]];then
 			#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
 			# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 		else
-			coreg_nii="${BIGGUS_DISKUS}/co_reg_${id}_m00-results/Reg_${id}_nii4D.nii.gz";
+			coreg_nii="${BIGGUS_DISKUS}/../mouse/co_reg_${id}_m00-results/Reg_${id}_nii4D.nii.gz";
 			echo " Coreg _nii = ${coreg_nii}"
 			degibbs_nii=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
 			
