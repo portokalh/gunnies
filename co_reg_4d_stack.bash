@@ -206,11 +206,7 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	   
 	    final_cmd="${reg_cmd};${apply_cmd}";	
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
-	    if [[ $num_string == '001' ]];then
-		    echo ${sub_cmd}; # Temp for Debugging
-		fi
-
-	   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+ 	    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 			
 	    if ((! $?));then
 			jid_list="${jid_list}${job_id},";
