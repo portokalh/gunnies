@@ -226,6 +226,7 @@ if [[ ! -f ${debiased} ]];then
 
 			if [[ ! -f ${coreg_nii} ]];then
 				jid=$(${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0);
+				echo "Last coregistration job id is ${jid}";
 			fi
 			
 			if [[ $cluster ]];then
