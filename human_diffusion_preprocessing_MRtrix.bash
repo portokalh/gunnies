@@ -73,7 +73,12 @@ fi
 
 echo "Processing diffusion data with runno/id: ${id}.";
 
-work_dir=${BD}/${proc_name}_${id};
+use_fsl=0;
+if ((${use_fsl}));then
+	work_dir=${BD}/${proc_name}_${id};
+else
+	work_dir=${BD}/${proc_name}_with_coreg_${id};
+fi
 echo "Work directory: ${work_dir}";
 if [[ ! -d ${work_dir} ]];then
     mkdir -pm 775 ${work_dir};
@@ -183,7 +188,9 @@ if [[ ! -f ${debiased} ]];then
 	fi
 	###
 	# 4. Perform motion and eddy current correction (requires FSL's `eddy`)
-	stage='04'
+	# OR alternatively, see how well our coreg performs.
+	stage='04';
+
 	preprocessed=${work_dir}/${id}_${stage}_dwi_nii4D_preprocessed.mif;
 	temp_mask=${work_dir}/${id}_mask_tmp.mif;
 	if [[ ! -f ${preprocessed} ]];then
@@ -198,23 +205,39 @@ if [[ ! -f ${debiased} ]];then
 		if [[ -f ${tmp_mask} ]];then
 			mask_string=" -mask ${temp_mask} ";
 		fi
+		
+		if ((${use_fsl}));then
+		
+			# Moved around first 3 steps; updating accordingly:
+			# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
+			json_string=" -pe_dir AP ";
+			maybe_json=${raw_nii/\.nii\.gz/json};
+			# Using the json file does not seem to properly provide the PE direction. 
+			#if [[ -f ${maybe_json} ]];then
+			#	json_string=" -json_import ${maybe_json} ";
+			#fi
+			eddy_opts='--repol --slm=linear'; 
+			n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -w);
+			if [[ ${n_shells} -gt 2 ]];then 
+				eddy_opts="${eddy_opts} --data_is_shelled ";
+			fi
+			dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 10 ${mask_string};
+			#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
+			# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
+		else
+			coreg_nii="${BIGGUS_DISKUS}/co_reg_${id}_m00-results/Reg_${id}_nii4D.nii.gz";
+			degibbs_nii=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
+			
+			if [[ ! -f ${degibbs_nii } && ! -f ${coreg_nii} ]];then
+				mrconvert ${degibbs} ${degibbs_nii};
+			fi
 
-		# Moved around first 3 steps; updating accordingly:
-		# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
-		json_string=" -pe_dir AP ";
-		maybe_json=${raw_nii/\.nii\.gz/json};
-		# Using the json file does not seem to properly provide the PE direction. 
-		#if [[ -f ${maybe_json} ]];then
-		#	json_string=" -json_import ${maybe_json} ";
-		#fi
-		eddy_opts='--repol --slm=linear'; 
-		n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -w);
-		if [[ ${n_shells} -gt 2 ]];then 
-			eddy_opts="${eddy_opts} --data_is_shelled ";
-		fi
-		dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 10 ${mask_string};
-		#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
-		# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
+			if [[ ! -f ${coreg_nii} ]];then
+				/mnt/clustertmp/common/rja20_dev/gunnies/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0;
+			fi
+			
+			mrconvert ${coreg_nii} ${preprocessed};
+		fi	
 	fi
 	
 	if [[ ! -f ${preprocessed} ]];then
@@ -223,6 +246,17 @@ if [[ ! -f ${debiased} ]];then
 		if [[ -f ${degibbs} ]];then
 			rm ${degibbs};	
 		fi
+		
+		if [[ -f ${degibbs_nii} ]];then
+			rm ${degibbs_nii};	
+		fi
+
+		coreg_dir="${BIGGUS_DISKUS}/co_reg_${id}_m00-results/";
+		if [[ -d ${coreg_dir} ]];then
+			rm -r ${coreg_dir};	
+		fi
+		
+		
 	fi
 	###
 	# 5. Bias field correction (optional but recommended)
