@@ -65,13 +65,14 @@ fi
 ## Determine if we are running on a cluster--for now it is incorrectly assumed that all clusters are SGE clusters
 cluster=$(bash cluster_test.bash);
 if [[ $cluster ]];then
-    echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
-    if [[ ${cluster} == 'SLURM' ]];then
+
+    if [[ ${cluster} -eq 1 ]];then
 		sub_script=${GD}/submit_slurm_cluster_job.bash;
 	fi
-    if [[ ${cluster} == 'SGE' ]];then
+    if [[ ${cluster} -eq 2 ]];then
 		sub_script=${GD}/submit_sge_cluster_job.bash
 	fi
+	echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
 fi
 
 
@@ -230,7 +231,7 @@ assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reas
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
 if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
-    sub_cmd="${GUNNIES}/submit_sge_cluster_job.bash ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
+    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
     echo ${sub_cmd};
 	if [[ ${cluster} -eq 1 ]];then
 		job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
