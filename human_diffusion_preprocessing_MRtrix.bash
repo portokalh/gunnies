@@ -244,7 +244,7 @@ if [[ ! -f ${debiased} ]];then
 				done	
 			fi
 					
-			if [[ -f $[coreg_nii} ]];then
+			if [[ -f ${coreg_nii} ]];then
 				mrconvert ${coreg_nii} ${preprocessed};
 			fi
 		fi	
