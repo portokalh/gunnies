@@ -10,34 +10,27 @@ proc_name="diffusion_prep_MRtrix"; # Not gonna call it diffusion_calc so we don'
 # Will try to auto-extract bval going forward...though it is not yet designed to handle multi-shell acquisitions.
 #nominal_bval='2000';
 
-GD=${GUNNIES}
-if [[ ! -d ${GD} ]];then
-	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
+#GD=${GUNNIES}
+#if [[ ! -d ${GD} ]];then
+#	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
+#fi
+
+if [[ -d ${GUNNIES} ]];then
+	GD=${GUNNIES};
+else
+	GD=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd );
 fi
 
-#Are we on a cluster? Asking for a friend...
-cluster=0;
-SGE_cluster=$(qstat  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
-slurm_cluster=$(sbatch --help  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
-# This returns '1' if NOT on a cluster, so let's reverse that...
-if ((${SGE_cluster} && ${slurm_cluster}));then
-	cluster=0;
-else
-	cluster=1;
+## Determine if we are running on a cluster--for now it is incorrectly assumed that all clusters are SGE clusters
+cluster=$(bash cluster_test.bash);
+if [[ $cluster ]];then
+    if [[ ${cluster} -eq 1 ]];then
+		sub_script=${GD}/submit_slurm_cluster_job.bash;
+	fi
+    if [[ ${cluster} -eq 2 ]];then
+		sub_script=${GD}/submit_sge_cluster_job.bash
+	fi
 	echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
-	if ((! ${slurm_cluster}));then
-		sub_script=${GUNNIES}/submit_slurm_cluster_job.bash
-		if [[ ! -f ${sub_script} ]];then
-			/mnt/clustertmp/common/rja20_dev/gunnies/submit_slurm_cluster_job.bash
-		fi
-	fi
-	if ((! ${SGE_cluster}));then
-		sub_script=${GUNNIES}/submit_sge_cluster_job.bash
-		if [[ ! -f ${sub_script} ]];then
-			/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash
-		fi
-	fi
-
 fi
 
 
@@ -232,10 +225,28 @@ if [[ ! -f ${debiased} ]];then
 			fi
 
 			if [[ ! -f ${coreg_nii} ]];then
-				${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0;
+				jid=$(${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0);
 			fi
 			
-			mrconvert ${coreg_nii} ${preprocessed};
+			if [[ $cluster ]];then
+				t=30;
+				while (($test));do
+					if [[ $cluster -eq 1 ]];then
+						test=$(squeue -h -j $jid 2>/dev/null | wc -l)
+					else
+						# The following test will also work for comma-separated job list, returning the list of
+						# jobs currently running.
+						test=$(qstat | grep -E ${jid//,/\|} 2>/dev/null | wc -l);
+					fi
+					echo '.';
+					sleep 15;
+					let "t--";
+				done	
+			fi
+					
+			if [[ -f $[coreg_nii} ]];then
+				mrconvert ${coreg_nii} ${preprocessed};
+			fi
 		fi	
 	fi
 	

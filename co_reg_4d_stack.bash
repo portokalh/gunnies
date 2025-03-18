@@ -222,6 +222,7 @@ else
     jid_list='0';
 fi
 
+return_code=0;
 reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ext}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
@@ -230,10 +231,11 @@ if [[ ! -f ${reg_nii4D} ]];then
     sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
 
 	job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-
-						
+				
     echo "JOB ID = ${job_id}; Job Name = ${name}";
-
+	if ((! $?));then
+		return_code=${job_id};
+	fi	  
 fi 
 
 if [[ "x${dti}x" == "x1x" ]];then
@@ -254,7 +256,8 @@ if [[ "x${dti}x" == "x1x" ]];then
 	echo $dsi_bvec_cmd;
 	$dsi_bvec_cmd;
     fi
-
-    
-
 fi
+
+echo ${return_code} && exit ${return_code};
+
+
