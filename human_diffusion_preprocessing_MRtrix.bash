@@ -271,9 +271,9 @@ if [[ ! -f ${debiased} ]];then
 			rm ${degibbs_nii};	
 		fi
 
-		coreg_dir="${BIGGUS_DISKUS}/co_reg_${id}_m00-results/";
+		coreg_dir="${BIGGUS_DISKUS}/co_reg_${id}_m${zeros}-results/";
 		if [[ -d ${coreg_dir} ]];then
-			rm -r ${coreg_dir};	
+			rm -r ${coreg_dir%results\/}*;	
 		fi
 		
 		
@@ -615,6 +615,9 @@ fi
 # 17. Calculate connectomes
 stage='17';
 conn_folder=/mnt/newStor/paros//paros_WORK/ADNI_connectomics/${id}_connectomics;
+if ((! $use_fsl));then
+	conn_folder=/mnt/newStor/paros//paros_WORK/ADNI_connectomics/${id}_with_coreg_connectomics;
+fi
 if [[ ! -d ${conn_folder} ]];then
 	mkdir ${conn_folder};
 fi
