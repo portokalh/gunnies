@@ -235,31 +235,27 @@ if [[ ! -f ${debiased} ]];then
 				jid=$(${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0);
 				echo "Last coregistration job id is ${jid}";
 			fi
-			echo "Checkpoint 690"
 			if [[ $cluster && $jid ]];then
 				t=30;
-				echo "Checkpoint 6900"
 				test=1;
 				while (($test));do
 				
 					if [[ $cluster -eq 1 ]];then
 						test=$(squeue -h -j $jid 2>/dev/null | wc -l);
-						echo "Checkpoint 690009"
 					else
 						# The following test will also work for comma-separated job list, returning the list of
 						# jobs currently running.
-						echo "Checkpoint 690348t384t"
+
 						test=$(qstat | grep -E ${jid//,/\|} 2>/dev/null | wc -l);
 					fi
 					echo '.';
-					echo $test;
 					sleep 15;
 					let "t--";
 				done	
 			fi
 					
 			if [[ -f ${coreg_nii} ]];then
-				mrconvert ${coreg_nii} ${preprocessed};
+				mrconvert ${coreg_nii} ${preprocessed}  -grad ${mrtrix_grad_table};
 			fi
 		fi	
 	fi
