@@ -236,6 +236,7 @@ if [[ ! -f ${debiased} ]];then
 				echo "Checkpoint 6900"
 				test=1;
 				while (($test));do
+				echo "Checkpoint 690009"
 					if [[ $cluster -eq 1 ]];then
 						test=$(squeue -h -j $jid 2>/dev/null | wc -l);
 					else
