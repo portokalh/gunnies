@@ -201,13 +201,7 @@ for bvalue in $(cat $bvals_list);do
 				   if ((${cluster}));then
 					   job_name="extract_vol_${c_vol}_from_${runno}";
 					   sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
-					  # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
-						if [[ ${cluster} -eq 1 ]];then
-							job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-						elif [[ ${cluster} -eq 2 ]];then
-						   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-						fi	
-						
+					   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);						
 						if ((! $?));then
 							jid_list="${jid_list}${job_id},";
 						fi
@@ -242,13 +236,7 @@ if [[ "x${vol_list}x" != "xx" ]];then
 			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -fr $work;fi;fi;" 
 			final_cmd="${average_cmd}${rm_cmd}";	
 			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
-			if [[ ${cluster} -eq 1 ]];then
-				job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-			elif [[ ${cluster} -eq 2 ]];then
-			   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-			fi	
-						
-	
+		    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
 		else
 			${average_cmd};

@@ -209,12 +209,9 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	    if [[ $num_string == '001' ]];then
 		    echo ${sub_cmd}; # Temp for Debugging
 		fi
-		if [[ ${cluster} -eq 1 ]];then
-			job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-		elif [[ ${cluster} -eq 2 ]];then
-		   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-		fi	
-						
+
+	   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+			
 	    if ((! $?));then
 			jid_list="${jid_list}${job_id},";
 	    fi	    
@@ -235,12 +232,9 @@ assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reas
 if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
     sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
-    
-	if [[ ${cluster} -eq 1 ]];then
-		job_id=$(${sub_cmd} | cut -d ' ' -f 4);						   
-	elif [[ ${cluster} -eq 2 ]];then
-	   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-	fi	
+
+	job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+
 						
     echo "JOB ID = ${job_id}; Job Name = ${name}";
 
