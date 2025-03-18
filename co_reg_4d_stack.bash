@@ -221,7 +221,7 @@ if ((${jid_list}));then
 else
     jid_list='0';
 fi
-
+echo "Debug point 69"
 return_code=0;
 reg_nii4D="${results}/${job_shorthand}_${runno}_nii4D.${ext}";
 assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reassemble_list}";
