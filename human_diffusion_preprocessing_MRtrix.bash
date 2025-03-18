@@ -194,20 +194,19 @@ if [[ ! -f ${debiased} ]];then
 	preprocessed=${work_dir}/${id}_${stage}_dwi_nii4D_preprocessed.mif;
 	temp_mask=${work_dir}/${id}_mask_tmp.mif;
 	if [[ ! -f ${preprocessed} ]];then
-		
-		# Going to make a temporary mask with dwi2mask, but use fsl's bet later from the b0
-		
-		if [[ ! -f ${tmp_mask} ]];then
-			dwi2mask ${degibbs} ${temp_mask};
-		fi
-		
-		mask_string=' ';
-		if [[ -f ${tmp_mask} ]];then
-			mask_string=" -mask ${temp_mask} ";
-		fi
-		
 		if ((${use_fsl}));then
 		
+			# Going to make a temporary mask with dwi2mask, but use fsl's bet later from the b0
+			
+			if [[ ! -f ${tmp_mask} ]];then
+				dwi2mask ${degibbs} ${temp_mask};
+			fi
+			
+			mask_string=' ';
+			if [[ -f ${tmp_mask} ]];then
+				mask_string=" -mask ${temp_mask} ";
+			fi
+
 			# Moved around first 3 steps; updating accordingly:
 			# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
 			json_string=" -pe_dir AP ";
