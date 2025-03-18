@@ -218,6 +218,7 @@ if [[ ! -f ${debiased} ]];then
 			# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
 		else
 			zeros='00';
+			echo "mrinfo ${degibbs} | grep Dimen | cut -d 'x' -f4 | tr -d [:space:]";
 			n_diffusion=$(mrinfo ${degibbs} | grep Dimen | cut -d 'x' -f4 | tr -d [:space:]);
 			if [[ ${n_diffusion} -gt 100 ]];then
 				zeros='000';
