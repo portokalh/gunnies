@@ -258,6 +258,6 @@ if [[ "x${dti}x" == "x1x" ]];then
     fi
 fi
 
-echo ${return_code} && exit ${return_code};
+echo ${return_code} && exit 0;
 
 
