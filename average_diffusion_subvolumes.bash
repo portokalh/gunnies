@@ -32,6 +32,11 @@ else
     ap="${ANTS_PATH}/";
 fi
 
+if [[ -d ${GUNNIES} ]];then
+	GD=${GUNNIES};
+else
+	GD=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd );
+fi
 
 nii4D=$1;
 bvals_list=$2;
@@ -42,28 +47,15 @@ bval_3=$6;
 bval_4=$7;
 
 ## Determine if we are running on a cluster--for now it is incorrectly assumed that all clusters are SGE clusters
-cluster=0;
-SGE_cluster=$(qstat  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
-slurm_cluster=$(sbatch --help  2>&1 | grep 'command not found' | wc -l | tr -d [:space:]);
-# This returns '1' if NOT on a cluster, so let's reverse that...
-if ((${SGE_cluster} && ${slurm_cluster}));then
-    cluster=0;
-else
-    cluster=1;
+cluster=$(bash cluster_test.bash);
+if [[ $cluster ]];then
     echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
-    if ((! ${slurm_cluster}));then
-		sub_script=${GUNNIES}/submit_slurm_cluster_job.bash
-		if [[ ! -f ${sub_script} ]];then
-			/mnt/clustertmp/common/rja20_dev/gunnies/submit_slurm_cluster_job.bash
-		fi
+    if [[ ${cluster} == 'SLURM' ]];then
+		sub_script=${GUNNIES}/submit_slurm_cluster_job.bash;
 	fi
-    if ((! ${SGE_cluster}));then
+    if [[ ${cluster} == 'SGE' ]];then
 		sub_script=${GUNNIES}/submit_sge_cluster_job.bash
-		if [[ ! -f ${sub_script} ]];then
-			/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash
-		fi
 	fi
-
 fi
 
 
@@ -210,10 +202,15 @@ for bvalue in $(cat $bvals_list);do
 					   job_name="extract_vol_${c_vol}_from_${runno}";
 					   sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 0 0 ${extract_cmd}";
 					  # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
-					   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-					   if ((! $?));then
-						jid_list="${jid_list}${job_id},";
-					   fi
+						if [[ ${cluster} == 'SGE' ]];then
+						   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+						else
+						   job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+						fi	
+						
+						if ((! $?));then
+							jid_list="${jid_list}${job_id},";
+						fi
 				   else
 					   ${extract_command};
 				   fi
@@ -245,7 +242,11 @@ if [[ "x${vol_list}x" != "xx" ]];then
 			rm_cmd="if [[ -f ${output} ]];then if [[ \"x${work}x\" != \"xx\" ]] && [[ -d ${work} ]];then rm -fr $work;fi;fi;" 
 			final_cmd="${average_cmd}${rm_cmd}";	
 			sub_cmd="${sub_script} ${sbatch_folder} ${job_name} 32000M  ${jid_list} ${final_cmd}";
-			job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+			if [[ ${cluster} == 'SGE' ]];then
+			   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+			else
+			   job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+			fi
 	
 			echo "JOB ID = ${job_id}; Job Name = ${job_name}";
 		else

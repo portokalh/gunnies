@@ -57,6 +57,25 @@ if [[ ! -f $nii4D ]];then
     echo "ABORTING: Input file does not exist: ${nii4D}" && exit 1;
 fi
 
+if [[ -d ${GUNNIES} ]];then
+	GD=${GUNNIES};
+else
+	GD=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd );
+fi
+## Determine if we are running on a cluster--for now it is incorrectly assumed that all clusters are SGE clusters
+cluster=$(bash cluster_test.bash);
+if [[ $cluster ]];then
+    echo "Great News, Everybody! It looks like we're running on a cluster, which should speed things up tremendously!";
+    if [[ ${cluster} == 'SLURM' ]];then
+		sub_script=${GD}/submit_slurm_cluster_job.bash;
+	fi
+    if [[ ${cluster} == 'SGE' ]];then
+		sub_script=${GD}/submit_sge_cluster_job.bash
+	fi
+fi
+
+
+
 #YYY_cmd="PrintHeader $nii4D 2 | cut -d 'x' -f4";
 YYY_cmd="PrintHeader $nii4D 2"; # Piping stdout seems to not work when running...agnostically(?)
 # I can't believe I'm about to do something so fucking retarded as this...
@@ -178,16 +197,19 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 
 	    bj_temp_test=1;
 	    if ((${bj_temp_test}));then
-		reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-7,15 ] -s 2x1x0.5vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
+			reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-7,15 ] -s 2x1x0.5vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
 	    else	
-		reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
+			reg_cmd="if [[ ! -e ${xform_xxx} ]];then ${ANTSPATH}/antsRegistration  --float -d 3 -v  -m Mattes[ ${target_vol},${vol_xxx},1,32,regular,0.3 ] -t Affine[0.05] -c [ 100x100x100,1.e-5,15 ] -s 0x0x0vox -f 4x2x1 -u 1 -z 1 -o ${out_prefix};fi";
 	    fi
 	    apply_cmd="if [[ ! -e ${vol_xxx_out} ]];then ${ANTSPATH}/antsApplyTransforms -d 3 -e 0 -i ${vol_xxx} -r ${vol_zero} -o ${vol_xxx_out} -n Linear -t ${xform_xxx}  -v 0 --float;fi";
 	   
 	    final_cmd="${reg_cmd};${apply_cmd}";	
-	    sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${name} 0 0 ${final_cmd}";
-	    # echo ${sub_cmd}; # Commented out because it was just too dang chatty!
-	    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
+		if [[ ${cluster} == 'SGE' ]];then
+		   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+		else
+		   job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+		fi
 	    if ((! $?));then
 		jid_list="${jid_list}${job_id},";
 	    fi	    
@@ -207,9 +229,13 @@ assemble_cmd="${ANTSPATH}/ImageMath 4 ${reg_nii4D} TimeSeriesAssemble 1 0 ${reas
 #if [[ 1 -eq 2 ]];then # Uncomment when we want to short-circuit this to OFF
 if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
-    sub_cmd="/mnt/clustertmp/common/rja20_dev/gunnies/submit_sge_cluster_job.bash ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
+    sub_cmd="${GUNNIES}/submit_sge_cluster_job.bash ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
     echo ${sub_cmd};
-    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+	if [[ ${cluster} == 'SGE' ]];then
+	   job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+	else
+	   job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+	fi
     echo "JOB ID = ${job_id}; Job Name = ${name}";
 
 fi 
