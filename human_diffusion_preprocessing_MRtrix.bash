@@ -66,7 +66,8 @@ fi
 
 echo "Processing diffusion data with runno/id: ${id}.";
 
-use_fsl=0;
+# I think we should always use fsl...our home brewed coreg seems to be too loosy-goosy
+use_fsl=1;
 if ((${use_fsl}));then
 	work_dir=${BD}/${proc_name}_${id};
 else
