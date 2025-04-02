@@ -8,9 +8,9 @@ if [[ "x${action_flag}x" == "xx" ]];then
 fi
 
 if (($action_flag == 1));then
-action='rm'
+	action='rm';
 else
-action='ls'
+	action='ls';
 fi
 #bad_runnos="${bad_runno_1} ${bad_runno_2} ${bad_runno_3}"; # Space-delimited list of bad runnos
 
