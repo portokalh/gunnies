@@ -88,7 +88,7 @@ test=0;
 
 if (( $output_gz )) || ((  $copy_data == 0 ));then
     if (( $input_gz ));then
-	test=$(gzip -lv $data | cut -d '%' -f1 );test=${test%\ *};test=${test%%\ };test=${test##*\ };
+		test=$(gzip -lv $data | cut -d '%' -f1 );test=${test%\ *};test=${test%%\ };test=${test##*\ };
     elif (( $output_gz ));then
     	if [[ $(man ls | grep block-size 2>/dev/null | wc -l) -gt 0 ]];then
 			test=$(ls -s --block-size=1 $data | cut -d ' ' -f1);
@@ -119,8 +119,8 @@ gunzip -c ${ref} | dd of=${tmp_header} bs=352 count=1;
 ## Copy input data if needed:
 if (( $copy_data ));then
     copied_file=$output;
-    if (( $input_gz )) && (( $output_gz == 0 )); then
-	copied_file="${copied_file}.gz";
+    if (( $input_gz == 0 )) && (( $output_gz == 1 )); then
+		copied_file="${copied_file%.gz}";
     fi
 
     cp $data $copied_file;
@@ -167,7 +167,7 @@ fi
 ## Clean up tmp header:
 rm ${tmp_header};
 
-## Pat yourself on the mastersciecing back:
+## Pat yourself on the mastersciencing back:
 echo "Spatial header info successfully copied from ${ref} onto image data from ${o_data}."
 echo "Final result saved in: $output."
 
