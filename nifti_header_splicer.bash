@@ -90,7 +90,11 @@ if (( $output_gz )) || ((  $copy_data == 0 ));then
     if (( $input_gz ));then
 	test=$(gzip -lv $data | cut -d '%' -f1 );test=${test%\ *};test=${test%%\ };test=${test##*\ };
     elif (( $output_gz ));then
-	test=$(ls -s --block-size=1 $data | cut -d ' ' -f1);
+    	if [[ $(man ls | grep block-size 2>/dev/null | wc -l) -gt 0 ]];then
+			test=$(ls -s --block-size=1 $data | cut -d ' ' -f1);
+		else
+			test=$(ls -l $data | cut -d ' ' -f1);
+		fi
     fi
 
     limit=1000000000; # Arbitrarily set to ~1GBi (but can be changed to your liking here)
