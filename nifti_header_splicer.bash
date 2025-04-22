@@ -93,7 +93,8 @@ if (( $output_gz )) || ((  $copy_data == 0 ));then
     	if [[ $(man ls | grep block-size 2>/dev/null | wc -l) -gt 0 ]];then
 			test=$(ls -s --block-size=1 $data | cut -d ' ' -f1);
 		else
-			test=$(ls -l $data | cut -d ' ' -f1);
+			test=$(ls -s $data | cut -d ' ' -f1);
+			echo 
 		fi
     fi
 
