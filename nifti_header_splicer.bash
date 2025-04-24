@@ -46,6 +46,8 @@ if [[ "x${data}x" == "x${output}x" ]];then
     copy_data=0;
 fi
 
+ref_name=${ref##*/}
+
 out_name=${output##*/}
 output_dir=${output%${out_name}};
 if [[ ${output_dir} != '' ]];then
@@ -114,7 +116,7 @@ fi
 
 
 ## Create temporary header file from reference:
-tmp_header="${output_dir}{ref}_for_${output}.tmp.hdr";
+tmp_header="${output_dir}${ref_name}_for_${output_name}.tmp.hdr";
 
 ## The following line can have fatal flaws when used in certain cluster situations.
 #zless ${ref} 1>/dev/null | head -c 352 > ${tmp_header};
