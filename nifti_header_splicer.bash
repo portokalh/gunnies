@@ -46,7 +46,8 @@ if [[ "x${data}x" == "x${output}x" ]];then
     copy_data=0;
 fi
 
-output_dir=${output%/*};
+out_name=${output##*/}
+output_dir=${output%${out_name}};
 if [[ ${output_dir} != '' ]];then
 	"output_dir=${output_dir}/"
 fi
