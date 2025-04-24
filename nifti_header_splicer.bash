@@ -46,6 +46,10 @@ if [[ "x${data}x" == "x${output}x" ]];then
     copy_data=0;
 fi
 
+output_dir=${output%/*};
+if [[ ${output_dir} != '' ]];then
+	"output_dir=${output_dir}/"
+fi
 o_data=$data;
 
 ## Set input_gz flag:
@@ -109,7 +113,7 @@ fi
 
 
 ## Create temporary header file from reference:
-tmp_header="${ref}.tmp.hdr";
+tmp_header="${output_dir}{ref}_for_${output}.tmp.hdr";
 
 ## The following line can have fatal flaws when used in certain cluster situations.
 #zless ${ref} 1>/dev/null | head -c 352 > ${tmp_header};
