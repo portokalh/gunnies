@@ -15,6 +15,8 @@ proc_name="diffusion_prep_MRtrix"; # Not gonna call it diffusion_calc so we don'
 #	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
 #fi
 
+project=HABS
+
 if [[ -d ${GUNNIES} ]];then
 	GD=${GUNNIES};
 else
@@ -573,7 +575,7 @@ stage='16';
 labels=${work_dir}/${id}_IITmean_RPI_labels.nii.gz;
 
 if [[ ! -e ${labels} ]];then
-	source_labels=${BIGGUS_DISKUS}/../mouse/VBM_25ADNI01_IITmean_RPI-results/connectomics/${id}/${id}_IITmean_RPI_labels.nii.gz;
+	source_labels=${BIGGUS_DISKUS}/../mouse/VBM_25${project}01_IITmean_RPI-results/connectomics/${id}/${id}_IITmean_RPI_labels.nii.gz;
 	if [[ -e ${source_labels} ]];then
 		cp ${source_labels} ${labels};
 	fi
