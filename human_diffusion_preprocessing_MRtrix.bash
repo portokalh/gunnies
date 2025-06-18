@@ -619,9 +619,9 @@ fi
 ###
 # 17. Calculate connectomes
 stage='17';
-conn_folder=/mnt/newStor/paros//paros_WORK/ADNI_connectomics/${id}_connectomics;
+conn_folder=/mnt/newStor/paros//paros_WORK/${project}_connectomics/${id}_connectomics;
 if ((! $use_fsl));then
-	conn_folder=/mnt/newStor/paros//paros_WORK/ADNI_connectomics/${id}_with_coreg_connectomics;
+	conn_folder=/mnt/newStor/paros//paros_WORK/${project}_connectomics/${id}_with_coreg_connectomics;
 fi
 if [[ ! -d ${conn_folder} ]];then
 	mkdir ${conn_folder};
