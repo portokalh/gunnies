@@ -604,9 +604,11 @@ if [[ max_label -gt 84 ]];then
 	for i in $(seq 1 84);do
 		mrcalc ${decomp_parcels} ${index2[$i-1]} $i -replace ${decomp_parcels} -force;
 	done
-	if [[ ! -f ${parcels_mif} ]];then
-		gzip ${decomp_parcels};
-	fi 
+	
+	if [[ -f ${parcels_mif} ]];then
+		rm ${parcels_mif}
+	fi
+	gzip ${decomp_parcels};
 fi
 
 max_label=$(mrstats -output max ${parcels_mif} | cut -d ' ' -f1);
