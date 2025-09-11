@@ -631,6 +631,7 @@ fi
 
 distances_csv=${conn_folder}/${id}_distances.csv;
 if [[ ! -f ${distances_csv} ]];then
+	echo "File not found: ${distances_csv}; Running tck2connectome...";
 	tck2connectome ${smaller_tracks} ${parcels_mif} ${distances_csv} -zero_diagonal -symmetric -scale_length -stat_edge  mean;
 fi
 
@@ -644,6 +645,7 @@ fi
 
 mean_FA_connectome=${conn_folder}/${id}_mean_FA_connectome.csv;
 if [[ ! -f ${mean_FA_connectome} ]];then
+	echo "File not found: ${mean_FA_connectome}; Running tck2connectome...";‘
 	tck2connectome ${smaller_tracks} ${parcels_mif} ${mean_FA_connectome} -zero_diagonal -symmetric -scale_file ${mean_FA_per_streamline} -stat_edge mean;
 fi
 
@@ -659,15 +661,17 @@ stage='18';
 #os.system('tck2connectome -symmetric -zero_diagonal -scale_invnodevol -tck_weights_in '+ sift_1M_txt+ ' '+ smallerTracks + ' '+ parcels_mif + ' '+ parcels_csv + ' -out_assignment ' + assignments_parcels_csv + ' -force')
 
 
-parcels_csv_2=${conn_folder}/${id}_onn_plain.csv;
+parcels_csv_2=${conn_folder}/${id}_con_plain.csv;
 assignments_parcels_csv2=${conn_folder}/${id}_assignments_con_plain.csv;
 if [[ ! -f ${parcels_csv_2} ||  ! -f ${assignments_parcels_csv2} ]];then
+	echo "File not found: ${parcels_csv_2}; Running tck2connectome...";
 	tck2connectome -symmetric -zero_diagonal ${smaller_tracks} ${parcels_mif} ${parcels_csv_2} -out_assignment ${assignments_parcels_csv2} -force;
 fi
 
-parcels_csv_3=${conn_folder}/${id}_onn_sift.csv;
+parcels_csv_3=${conn_folder}/${id}_con_sift.csv;
 assignments_parcels_csv3=${conn_folder}/${id}_assignments_con_sift.csv;
 if [[ ! -f ${parcels_csv_3} ||  ! -f ${assignments_parcels_csv3} ]];then
+	echo "File not found: ${parcels_csv_3}; Running tck2connectome...";
 	tck2connectome -symmetric -zero_diagonal -tck_weights_in ${sift_1M_txt} ${smaller_tracks} ${parcels_mif} ${parcels_csv_3} -out_assignment ${assignments_parcels_csv3} -force;
 fi
 
