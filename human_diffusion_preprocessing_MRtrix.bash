@@ -133,7 +133,7 @@ fi
 
 
 if [[ ! -f ${bvecs} ]];then
-    bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
+    bvec_cmd="./extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
     $bvec_cmd;
 fi
 
