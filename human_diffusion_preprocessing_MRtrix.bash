@@ -1,61 +1,4 @@
 #! /bin/bash
-# ====== AUTO-DETECT HELPERS (BIDS JSON; folder input; reverse-PE) ======
-need() { command -v "$1" >/dev/null 2>&1 || { echo "[ERR ] Missing dependency: $1"; exit 2; }; }
-need jq >/dev/null 2>&1 || echo "[WARN] 'jq' not found; auto-detection of JSON metadata may fail."
-
-json_for() {
-  local nii="$1"; local base="${nii%.gz}"; base="${base%.nii}"
-  local j1="${base}.json"
-  [[ -f "$j1" ]] && { echo "$j1"; return 0; }
-  local jalt; jalt=$(ls -1 "${base}"*.json 2>/dev/null | head -n1 || true)
-  [[ -n "$jalt" ]] && { echo "$jalt"; return 0; }
-  return 1
-}
-
-pe_bids_to_mrtrix() {
-  case "$1" in
-    i)  echo "LR" ;; i-) echo "RL" ;;
-    j)  echo "PA" ;; j-) echo "AP" ;;
-    k)  echo "IS" ;; k-) echo "SI" ;;
-    *)  echo ""   ;;
-  esac
-}
-
-readout_from_json() {
-  local j="$1"; local trt
-  trt=$(jq -r '."TotalReadoutTime" // empty' "$j" 2>/dev/null)
-  if [[ -n "$trt" && "$trt" != "null" ]]; then echo "$trt"; return 0; fi
-  local ees rpe ape
-  ees=$(jq -r '."EffectiveEchoSpacing" // ."DerivedVendorReportedEchoSpacing" // empty' "$j" 2>/dev/null)
-  rpe=$(jq -r '."ReconMatrixPE" // empty' "$j" 2>/dev/null)
-  ape=$(jq -r '."AcquisitionMatrixPE" // empty' "$j" 2>/dev/null)
-  if [[ -n "$ees" && "$ees" != "null" ]]; then
-    if [[ -n "$rpe" && "$rpe" != "null" ]]; then awk -v ees="$ees" -v n="$rpe" 'BEGIN{printf "%.6f", ees*(n-1)}'; echo; return 0; fi
-    if [[ -n "$ape" && "$ape" != "null" ]]; then awk -v ees="$ees" -v n="$ape" 'BEGIN{printf "%.6f", ees*(n-1)}'; echo; return 0; fi
-  fi
-  echo ""
-}
-
-autodetect_pe_and_readout() {
-  local nii="$1"; local j; j=$(json_for "$nii" || true)
-  local mrtrix_pe="" ro=""
-  if [[ -n "$j" ]]; then
-    local bids_pe; bids_pe=$(jq -r '."PhaseEncodingDirection" // empty' "$j" 2>/dev/null)
-    [[ -n "$bids_pe" && "$bids_pe" != "null" ]] && mrtrix_pe=$(pe_bids_to_mrtrix "$bids_pe")
-    ro=$(readout_from_json "$j")
-  fi
-  echo "${mrtrix_pe}|${ro}"
-}
-
-opposite_of() {
-  case "$1" in
-    AP) echo "PA" ;; PA) echo "AP" ;;
-    RL) echo "LR" ;; LR) echo "RL" ;;
-    IS) echo "SI" ;; SI) echo "IS" ;;
-    *)  echo ""   ;;
-  esac
-}
-# ====== END HELPERS ======
 # Process name
 proc_name="diffusion_prep_MRtrix"; # Not gonna call it diffusion_calc so we don't assume it does the same thing as the civm pipeline
 
@@ -72,7 +15,7 @@ proc_name="diffusion_prep_MRtrix"; # Not gonna call it diffusion_calc so we don'
 #	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
 #fi
 
-project=ADRC
+project=HABS
 
 if [[ -d ${GUNNIES} ]];then
 	GD=${GUNNIES};
@@ -114,55 +57,7 @@ fi
 
 
 id=$1;
-
-# ----- AUTO TOPUP: optional flags -----
-revpe="${revpe:-}"
-pe_dir_main="${pe_dir_main:-auto}"
-readout_time="${readout_time:-}"
-eddy_threads="${eddy_threads:-10}"
-
-# Parse remaining CLI args without breaking existing usage
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --revpe)        revpe="$2"; shift 2 ;;
-    --pe-dir)       pe_dir_main="$2"; shift 2 ;;
-    --readout)      readout_time="$2"; shift 2 ;;
-    --eddy-threads) eddy_threads="$2"; shift 2 ;;
-    --)             shift; break ;;
-    *)              # pass-through/unknown
-                    shift ;;
-  esac
-done
-
 raw_nii=$2;
-
-# ----- If $2 is a directory, auto-pick main DWI and reverse by size -----
-_input_candidate="${2:-$raw_nii}"
-if [[ -d "$_input_candidate" ]]; then
-  echo "[auto] Directory input detected: $_input_candidate"
-  mapfile -t _nii_list < <(find "$_input_candidate" -maxdepth 1 -type f \( -iname "*.nii" -o -iname "*.nii.gz" \) -printf "%s\t%p\n" | sort -nr | awk 'NR<=2{print $2}')
-  if [[ ${#_nii_list[@]} -lt 1 ]]; then
-    echo "[ERR ] No NIfTI files found in $_input_candidate"; exit 3
-  fi
-  # main DWI = largest; reverse = 2nd largest (if any)
-  main_candidate="${_nii_list[0]}"
-  rev_candidate=""
-  if [[ ${#_nii_list[@]} -ge 2 ]]; then rev_candidate="${_nii_list[1]}"; fi
-
-  # prefer files with rev hints in names for reverse
-  shopt -s nocasematch
-  if [[ -n "$rev_candidate" ]] && [[ ! "$(basename "$rev_candidate")" =~ (revphase|rev|reverse) ]] && [[ "$(basename "$main_candidate")" =~ (revphase|rev|reverse) ]]; then
-    tmp="$main_candidate"; main_candidate="$rev_candidate"; rev_candidate="$tmp"
-  fi
-  shopt -u nocasematch
-
-  # set raw_nii to main; only override reverse if user didn't pass --revpe
-  if [[ -n "$raw_nii" && -f "$raw_nii" ]]; then :; else raw_nii="$main_candidate"; fi
-  if [[ -z "$revpe" && -n "$rev_candidate" ]]; then revpe="$rev_candidate"; fi
-  echo "[auto] Picked main: $raw_nii"
-  [[ -n "$revpe" ]] && echo "[auto] Picked reverse: $revpe"
-fi
-
 no_cleanup=$3;
 
 if [[ "x1x" == "x${no_cleanup}x" ]];then
@@ -290,86 +185,105 @@ if [[ ! -f ${debiased} ]];then
 	###
 	# 4. Perform motion and eddy current correction (requires FSL's `eddy`)
 	# OR alternatively, see how well our coreg performs.
-# ----- Auto-detect PhaseEncodingDirection & TotalReadoutTime from JSON -----
-_auto_main="$(autodetect_pe_and_readout "${raw_nii}")"
-_auto_main_pe="${_auto_main%%|*}"
-_auto_main_ro="${_auto_main##*|}"
+	stage='04';
 
-_auto_rev_pe=""; _auto_rev_ro=""
-if [[ -n "${revpe:-}" && -f "$revpe" ]]; then
-  _auto_rev="$(autodetect_pe_and_readout "${revpe}")"
-  _auto_rev_pe="${_auto_rev%%|*}"
-  _auto_rev_ro="${_auto_rev##*|}"
-fi
+	preprocessed=${work_dir}/${id}_${stage}_dwi_nii4D_preprocessed.mif;
+	temp_mask=${work_dir}/${id}_mask_tmp.mif;
+	if [[ ! -f ${preprocessed} ]];then
+		if ((${use_fsl}));then
+		
+			# Going to make a temporary mask with dwi2mask, but use fsl's bet later from the b0
+			
+			if [[ ! -f ${tmp_mask} ]];then
+				dwi2mask ${degibbs} ${temp_mask};
+			fi
+			
+			mask_string=' ';
+			if [[ -f ${tmp_mask} ]];then
+				mask_string=" -mask ${temp_mask} ";
+			fi
 
-if [[ -z "${pe_dir_main:-}" || "${pe_dir_main}" == "auto" ]]; then
-  if [[ -n "$_auto_main_pe" ]]; then pe_dir_main="$_auto_main_pe"; echo "[auto] pe_dir (main) = $pe_dir_main"; else pe_dir_main="AP"; echo "[warn] Could not auto-detect PE; defaulting to $pe_dir_main"; fi
-fi
+			# Moved around first 3 steps; updating accordingly:
+			# dwifslpreproc ${dwi_mif} ${preprocessed} -rpe_none -pe_dir AP -eddy_options " --repol " -nocleanup
+			json_string=" -pe_dir AP ";
+			maybe_json=${raw_nii/\.nii\.gz/json};
+			# Using the json file does not seem to properly provide the PE direction. 
+			#if [[ -f ${maybe_json} ]];then
+			#	json_string=" -json_import ${maybe_json} ";
+			#fi
+			eddy_opts='--repol --slm=linear'; 
+			n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -w);
+			if [[ ${n_shells} -gt 2 ]];then 
+				eddy_opts="${eddy_opts} --data_is_shelled ";
+			fi
+			dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " ${eddy_opts} " -scratch ${work_dir}/ -nthreads 10 ${mask_string};
+			#dwifslpreproc ${degibbs} ${preprocessed} ${json_string} -rpe_none -eddy_options " --repol --slm=linear " -scratch ${work_dir}/ -nthreads 8
+			# Note: '--repol' automatically corrects for artefact due to signal dropout caused by subject movement
+		else
+			zeros='00';
+			echo "mrinfo ${degibbs} | grep Dimen | cut -d 'x' -f4 | tr -d [:space:]";
+			n_diffusion=$(mrinfo ${degibbs} | grep Dimen | cut -d 'x' -f4 | tr -d [:space:]);
+			if [[ ${n_diffusion} -gt 100 ]];then
+				zeros='000';
+			fi
+			coreg_nii="${BIGGUS_DISKUS}/../mouse/co_reg_${id}_m${zeros}-results/Reg_${id}_nii4D.nii.gz";
+			echo " Coreg _nii = ${coreg_nii}"
+			degibbs_nii=${work_dir}/${id}_${stage}_dwi_nii4D_degibbs.nii.gz;
+			
+			if [[ ! -f ${degibbs_nii} && ! -f ${coreg_nii} ]];then
+				mrconvert ${degibbs} ${degibbs_nii};
+			fi
 
-if [[ -z "${readout_time:-}" ]]; then
-  if [[ -n "$_auto_main_ro" ]]; then readout_time="$_auto_main_ro"; echo "[auto] readout_time (main) = ${readout_time}s"; \
-  elif [[ -n "$_auto_rev_ro" ]]; then readout_time="$_auto_rev_ro"; echo "[auto] readout_time (from reverse) = ${readout_time}s"; \
-  else echo "[warn] TotalReadoutTime not found; you may pass --readout <sec>."; fi
-fi
+			if [[ ! -f ${coreg_nii} ]];then
+				jid=$(${GUNNIES}/co_reg_4d_stack.bash ${degibbs_nii} ${id} 0);
+				echo "Last coregistration job id is ${jid}";
+			fi
+			if [[ $cluster && $jid ]];then
+				t=30;
+				test=1;
+				while (($test));do
+				
+					if [[ $cluster -eq 1 ]];then
+						test=$(squeue -h -j $jid 2>/dev/null | wc -l);
+					else
+						# The following test will also work for comma-separated job list, returning the list of
+						# jobs currently running.
 
-if [[ -n "$revpe" && -n "$_auto_rev_pe" ]]; then
-  _expect="$(opposite_of "$pe_dir_main")"
-  if [[ -n "$_expect" && "$_auto_rev_pe" != "$_expect" ]]; then
-    echo "[note] Reverse PE appears to be $_auto_rev_pe; expected $_expect. Proceeding."
-  fi
-fi
-###
-# 4. Perform motion + eddy + (optionally) TOPUP with reverse-PE (via MRtrix dwifslpreproc)
-stage='04';
+						test=$(qstat | grep -E ${jid//,/\|} 2>/dev/null | wc -l);
+					fi
+					echo '.';
+					sleep 15;
+					let "t--";
+				done	
+			fi
+					
+			if [[ -f ${coreg_nii} ]];then
+				mrconvert ${coreg_nii} ${preprocessed}  -grad ${mrtrix_grad_table};
+			fi
+		fi	
+	fi
+	
+	if [[ ! -f ${preprocessed} ]];then
+		echo "Process died during stage ${stage}" && exit 1;
+	elif ((${cleanup}));then
+		if [[ -f ${degibbs} ]];then
+			rm ${degibbs};	
+		fi
+		
+		if [[ -f ${degibbs_nii} ]];then
+			rm ${degibbs_nii};	
+		fi
 
-preprocessed=${work_dir}/${id}_${stage}_dwi_nii4D_preprocessed.mif;
-temp_mask=${work_dir}/${id}_mask_tmp.mif;
-
-if [[ ! -f ${preprocessed} ]]; then
-  if ((${use_fsl})); then
-    if [[ ! -f ${temp_mask} ]]; then
-      dwi2mask ${degibbs} ${temp_mask}
-    fi
-    mask_string=' '
-    if [[ -f ${temp_mask} ]]; then mask_string=" -mask ${temp_mask} "; fi
-
-    eddy_opts='--repol --slm=linear'
-    n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -w)
-    if [[ ${n_shells} -gt 2 ]]; then eddy_opts="${eddy_opts} --data_is_shelled "; fi
-
-    se_epi=""; se_epi_nii="${work_dir}/${id}_rev_seepi.nii.gz"
-    if [[ -n "${revpe:-}" && -f "${revpe}" ]]; then
-      rev_base="${revpe%.gz}"; rev_base="${rev_base%.nii}"
-      if [[ -f "${rev_base}.bval" ]]; then
-        idx=$(awk '{for(i=1;i<=NF;i++) if ($i<50){print (i-1); exit}}' "${rev_base}.bval" || true)
-        [[ -z "$idx" ]] && idx=0
-        fslroi "${revpe}" "${se_epi_nii}" "$idx" 1
-      else
-        cp "${revpe}" "${se_epi_nii}"
-      fi
-      se_epi="${se_epi_nii}"
-    fi
-
-    if [[ -n "$se_epi" && -n "${readout_time:-}" ]]; then
-      echo "[stage 04] Using reverse-PE TOPUP+EDDY with -rpe_pair (pe_dir=${pe_dir_main}, readout=${readout_time}s)."
-      dwifslpreproc ${degibbs} ${preprocessed} \
-        -pe_dir ${pe_dir_main} \
-        -rpe_pair -se_epi "${se_epi}" \
-        -readout_time ${readout_time} \
-        -eddy_options " ${eddy_opts} " \
-        -scratch ${work_dir}/ -nthreads ${eddy_threads} ${mask_string}
-    else
-      echo "[stage 04] No reverse-PE inputs; using -rpe_none (pe_dir=${pe_dir_main})."
-      dwifslpreproc ${degibbs} ${preprocessed} \
-        -pe_dir ${pe_dir_main} -rpe_none \
-        -eddy_options " ${eddy_opts} " \
-        -scratch ${work_dir}/ -nthreads ${eddy_threads} ${mask_string}
-    fi
-  else
-    # Keep existing non-FSL fallback block if present (coregistration-based)
-    : # (left intentionally as no-op; your original non-FSL branch remains outside this replace)
-  fi
-fi	stage='05';
+		coreg_dir="${BIGGUS_DISKUS}/co_reg_${id}_m${zeros}-results/";
+		if [[ -d ${coreg_dir} ]];then
+			rm -r ${coreg_dir%results\/}*;	
+		fi
+		
+		
+	fi
+	###
+	# 5. Bias field correction (optional but recommended)
+	stage='05';
 	debiased=${work_dir}/${id}_${stage}_dwi_nii4D_biascorrected.mif
 	mask_string=' ';
 	if [[ -f ${tmp_mask} ]];then
