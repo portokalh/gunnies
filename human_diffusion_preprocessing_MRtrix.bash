@@ -60,6 +60,31 @@ id=$1;
 raw_nii=$2;
 no_cleanup=$3;
 
+# ---- If $2 is a directory of NIfTIs, pick main + reverse before anything else ----
+if [[ -d "$raw_nii" ]]; then
+  echo "[auto] Directory input: $raw_nii"
+  mapfile -t _nii < <(find "$raw_nii" -maxdepth 1 -type f \( -iname "*.nii" -o -iname "*.nii.gz" \) \
+                      -printf "%s\t%p\n" | sort -nr | awk 'NR<=2{print $2}')
+  if [[ ${#_nii[@]} -lt 1 ]]; then
+    echo "[ERR] No NIfTI files in $raw_nii"; exit 2
+  fi
+  # Largest = main DWI; second largest (if present) = reverse
+  raw_nii="${_nii[0]}"
+  revpe="${_nii[1]:-}"
+  echo "[auto] main DWI: $raw_nii"
+  [[ -n "$revpe" ]] && echo "[auto] reverse: $revpe"
+fi
+
+# If your script tries to copy bvec/bval, guard it:
+if [[ -f "${raw_nii%.gz}.bvec" && -f "${raw_nii%.gz}.bval" ]]; then
+  cp "${raw_nii%.gz}.bvec" "$Bvecs"
+  cp "${raw_nii%.gz}.bval" "$Bvals"
+else
+  echo "[note] No external .bvec/.bval next to ${raw_nii}; rely on MRtrix/FSL exports later."
+fi
+
+
+
 if [[ "x1x" == "x${no_cleanup}x" ]];then
     cleanup=0;
 else
