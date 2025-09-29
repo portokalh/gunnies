@@ -72,7 +72,7 @@ proc_name="diffusion_prep_MRtrix"; # Not gonna call it diffusion_calc so we don'
 #	echo "env variable '$GUNNIES' not defined...failing now..."  && exit 1
 #fi
 
-project=HABS
+project=ADRC
 
 if [[ -d ${GUNNIES} ]];then
 	GD=${GUNNIES};
