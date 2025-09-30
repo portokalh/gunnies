@@ -45,7 +45,7 @@ readout_from_json() {
   if [[ -n "$ees" && "$ees" != "null" ]]; then
     if [[ -n "$rpe" && "$rpe" != "null" ]]; then awk -v ees="$ees" -v n="$rpe" 'BEGIN{printf "%.6f", ees*(n-1)}'; echo; return 0; fi
     if [[ -n "$ape" && "$ape" != "null" ]]; then awk -v ees="$ees" -v n="$ape" 'BEGIN{printf "%.6f", ees*(n-1)}'; echo; return 0; fi
-# (auto-removed stray)   fi
+  fi
   echo ""
 }
 opposite_of() {
