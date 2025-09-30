@@ -60,31 +60,6 @@ id=$1;
 raw_nii=$2;
 no_cleanup=$3;
 
-# ---- If $2 is a directory of NIfTIs, pick main + reverse before anything else ----
-if [[ -d "$raw_nii" ]]; then
-  echo "[auto] Directory input: $raw_nii"
-  mapfile -t _nii < <(find "$raw_nii" -maxdepth 1 -type f \( -iname "*.nii" -o -iname "*.nii.gz" \) \
-                      -printf "%s\t%p\n" | sort -nr | awk 'NR<=2{print $2}')
-  if [[ ${#_nii[@]} -lt 1 ]]; then
-    echo "[ERR] No NIfTI files in $raw_nii"; exit 2
-  fi
-  # Largest = main DWI; second largest (if present) = reverse
-  raw_nii="${_nii[0]}"
-  revpe="${_nii[1]:-}"
-  echo "[auto] main DWI: $raw_nii"
-  [[ -n "$revpe" ]] && echo "[auto] reverse: $revpe"
-fi
-
-# If your script tries to copy bvec/bval, guard it:
-if [[ -f "${raw_nii%.gz}.bvec" && -f "${raw_nii%.gz}.bval" ]]; then
-  cp "${raw_nii%.gz}.bvec" "$Bvecs"
-  cp "${raw_nii%.gz}.bval" "$Bvals"
-else
-  echo "[note] No external .bvec/.bval next to ${raw_nii}; rely on MRtrix/FSL exports later."
-fi
-
-
-
 if [[ "x1x" == "x${no_cleanup}x" ]];then
     cleanup=0;
 else
@@ -121,85 +96,73 @@ bvecs=${work_dir}/${id}_bvecs.txt;
 bvals=${bvecs/bvecs/bvals};
 
 echo "Bvecs: ${bvecs}";
+# --- BEGIN robust gradients resolution for NIfTI / BXH (drop-in) ---
+# main NIfTI chosen earlier (folder input logic set raw_nii)
+main_nii="${raw_nii}"
+main_base="${main_nii%.gz}"; main_base="${main_base%.nii}"
+
+# default sources (if sidecars exist next to the NIfTI)
+src_bvec="${main_base}.bvec"
+src_bval="${main_base}.bval"
+
+have_grads=0
+if [[ -s "$src_bvec" && -s "$src_bval" ]]; then
+  have_grads=1
+else
+  echo "[auto] No .bvec/.bval next to ${main_nii}; trying to extract from BXH…"
+  # try BXH with the same stem first
+  bxh_file="${main_base}.bxh"
+  if [[ ! -f "$bxh_file" ]]; then
+    # fallback: first non-revphase BXH in the same directory
+    bxh_file="$(ls -1 "$(dirname "$main_nii")"/*.bxh 2>/dev/null | grep -vi 'revphase' | head -n1)"
+  fi
+
+  if [[ -n "$bxh_file" && -f "$bxh_file" ]]; then
+    echo "[auto] BXH found: $bxh_file"
+    # Prefer helper if present (local→ssh andros→scp), else run local extractdiffdirs
+    if declare -f run_extractdiffdirs >/dev/null 2>&1; then
+      run_extractdiffdirs "$bxh_file" "$main_base" || echo "[warn] run_extractdiffdirs failed"
+    else
+      if command -v extractdiffdirs >/dev/null 2>&1; then
+        extractdiffdirs "$bxh_file" "$main_base" || echo "[warn] extractdiffdirs failed"
+      else
+        echo "[warn] extractdiffdirs not available and no helper; cannot extract from BXH."
+      fi
+    fi
+
+    # refresh sources after attempted extraction
+    src_bvec="${main_base}.bvec"
+    src_bval="${main_base}.bval"
+    [[ -s "$src_bvec" && -s "$src_bval" ]] && have_grads=1
+  else
+    echo "[note] No BXH sibling found for ${main_nii}; skipping BXH extraction."
+  fi
+fi
+
+# now, only copy if we actually have grads
+if [[ $have_grads -eq 1 ]]; then
+  echo "[grads] using $src_bvec / $src_bval"
+  # your script defines Bvecs/Bvals paths already; guard the copies
+  if [[ -n "${Bvecs:-}" ]]; then cp -f "$src_bvec" "$Bvecs"; fi
+  if [[ -n "${Bvals:-}" ]]; then cp -f "$src_bval" "$Bvals"; fi
+else
+  echo "[warn] No gradients available as .bvec/.bval; downstream must infer from .mif or JSON."
+fi
+# --- END robust gradients resolution ---
 
 if [[ ! -f ${bvecs} ]];then
-	cp ${raw_nii/\.nii\.gz/\.bvec} ${bvecs}
+# (auto-disabled) 	cp ${raw_nii/\.nii\.gz/\.bvec} ${bvecs}
 fi
 
 if [[ ! -f ${bvals} ]];then
 	cp ${raw_nii/\.nii\.gz/\.bval} ${bvals}
 fi
 
-run_extractdiffdirs() {
-  local bxh_file="$1"
-  local out_prefix="$2"
-  local remote_host="${REMOTE_HOST:-andros}"     # override if needed
-  local remote_opts="${SSH_OPTS:--o BatchMode=yes -o ConnectTimeout=6}"
-  local need_scp="${REMOTE_SCP:-auto}"           # auto|on|off
-
-  [[ -f "$bxh_file" ]] || { echo "[ERR] BXH not found: $bxh_file"; return 2; }
-  [[ -n "$out_prefix" ]] || { echo "[ERR] Missing out_prefix"; return 2; }
-
-  local out_dir; out_dir="$(dirname "$out_prefix")"
-  local out_base; out_base="$(basename "$out_prefix")"
-  mkdir -p "$out_dir"
-
-  # --- 1) try local ---
-  if command -v extractdiffdirs >/dev/null 2>&1; then
-    echo "[BXH] Local extractdiffdirs ... ($bxh_file)"
-    if extractdiffdirs "$bxh_file" "$out_prefix"; then
-      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-        echo "[BXH] OK (local) → ${out_prefix}.bvec / .bval"
-        return 0
-      fi
-      echo "[BXH] Local ran but outputs missing/empty; will try remote."
-    else
-      echo "[BXH] Local extractdiffdirs failed; will try remote."
-    fi
-  else
-    echo "[BXH] extractdiffdirs not found locally; will try remote."
-  fi
-
-  # --- 2) remote on andros ---
-  echo "[BXH] Remote check on ${remote_host} ..."
-  if ssh $remote_opts "$remote_host" 'command -v extractdiffdirs >/dev/null 2>&1'; then
-    echo "[BXH] Running remote: extractdiffdirs '$bxh_file' '$out_prefix'"
-    if ssh $remote_opts "$remote_host" "extractdiffdirs '$bxh_file' '$out_prefix'"; then
-      # If filesystems are shared, they should already exist locally:
-      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-        echo "[BXH] OK (remote, shared FS) → ${out_prefix}.bvec / .bval"
-        return 0
-      fi
-
-      # Not visible locally → try to scp back (auto or on)
-      if [[ "$need_scp" == "auto" || "$need_scp" == "on" ]]; then
-        echo "[BXH] Outputs not on local FS; attempting scp from ${remote_host}"
-        scp $remote_opts "${remote_host}:${out_prefix}.bvec" "${out_dir}/${out_base}.bvec" || true
-        scp $remote_opts "${remote_host}:${out_prefix}.bval" "${out_dir}/${out_base}.bval" || true
-      fi
-
-      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-        echo "[BXH] OK (remote→scp) → ${out_prefix}.bvec / .bval"
-        return 0
-      else
-        echo "[ERR] Remote ran but outputs not found locally (and scp failed)."
-        return 3
-      fi
-    else
-      echo "[ERR] Remote extractdiffdirs failed on ${remote_host}."
-      return 3
-    fi
-  else
-    echo "[ERR] extractdiffdirs not available on ${remote_host} (or SSH failed)."
-    return 4
-  fi
-}
 
 
 if [[ ! -f ${bvecs} ]];then
-    #bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
-    #$bvec_cmd;
-    run_extractdiffdirs ${bxh_file} ${out_prefix};	
+    bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
+    $bvec_cmd;
 fi
 
 mrtrix_grad_table="${bvals%.b*}_grad_corrected.b";
