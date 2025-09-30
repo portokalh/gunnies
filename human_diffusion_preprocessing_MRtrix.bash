@@ -130,11 +130,76 @@ if [[ ! -f ${bvals} ]];then
 	cp ${raw_nii/\.nii\.gz/\.bval} ${bvals}
 fi
 
+run_extractdiffdirs() {
+  local bxh_file="$1"
+  local out_prefix="$2"
+  local remote_host="${REMOTE_HOST:-andros}"     # override if needed
+  local remote_opts="${SSH_OPTS:--o BatchMode=yes -o ConnectTimeout=6}"
+  local need_scp="${REMOTE_SCP:-auto}"           # auto|on|off
+
+  [[ -f "$bxh_file" ]] || { echo "[ERR] BXH not found: $bxh_file"; return 2; }
+  [[ -n "$out_prefix" ]] || { echo "[ERR] Missing out_prefix"; return 2; }
+
+  local out_dir; out_dir="$(dirname "$out_prefix")"
+  local out_base; out_base="$(basename "$out_prefix")"
+  mkdir -p "$out_dir"
+
+  # --- 1) try local ---
+  if command -v extractdiffdirs >/dev/null 2>&1; then
+    echo "[BXH] Local extractdiffdirs ... ($bxh_file)"
+    if extractdiffdirs "$bxh_file" "$out_prefix"; then
+      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
+        echo "[BXH] OK (local) → ${out_prefix}.bvec / .bval"
+        return 0
+      fi
+      echo "[BXH] Local ran but outputs missing/empty; will try remote."
+    else
+      echo "[BXH] Local extractdiffdirs failed; will try remote."
+    fi
+  else
+    echo "[BXH] extractdiffdirs not found locally; will try remote."
+  fi
+
+  # --- 2) remote on andros ---
+  echo "[BXH] Remote check on ${remote_host} ..."
+  if ssh $remote_opts "$remote_host" 'command -v extractdiffdirs >/dev/null 2>&1'; then
+    echo "[BXH] Running remote: extractdiffdirs '$bxh_file' '$out_prefix'"
+    if ssh $remote_opts "$remote_host" "extractdiffdirs '$bxh_file' '$out_prefix'"; then
+      # If filesystems are shared, they should already exist locally:
+      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
+        echo "[BXH] OK (remote, shared FS) → ${out_prefix}.bvec / .bval"
+        return 0
+      fi
+
+      # Not visible locally → try to scp back (auto or on)
+      if [[ "$need_scp" == "auto" || "$need_scp" == "on" ]]; then
+        echo "[BXH] Outputs not on local FS; attempting scp from ${remote_host}"
+        scp $remote_opts "${remote_host}:${out_prefix}.bvec" "${out_dir}/${out_base}.bvec" || true
+        scp $remote_opts "${remote_host}:${out_prefix}.bval" "${out_dir}/${out_base}.bval" || true
+      fi
+
+      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
+        echo "[BXH] OK (remote→scp) → ${out_prefix}.bvec / .bval"
+        return 0
+      else
+        echo "[ERR] Remote ran but outputs not found locally (and scp failed)."
+        return 3
+      fi
+    else
+      echo "[ERR] Remote extractdiffdirs failed on ${remote_host}."
+      return 3
+    fi
+  else
+    echo "[ERR] extractdiffdirs not available on ${remote_host} (or SSH failed)."
+    return 4
+  fi
+}
 
 
 if [[ ! -f ${bvecs} ]];then
-    bvec_cmd="./extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
-    $bvec_cmd;
+    #bvec_cmd="extractdiffdirs --colvectors --writebvals --fieldsep=\t --space=RAI ${bxheader} ${bvecs} ${bvals}";
+    #$bvec_cmd;
+    run_extractdiffdirs ${bxh_file} ${out_prefix};	
 fi
 
 mrtrix_grad_table="${bvals%.b*}_grad_corrected.b";
