@@ -60,6 +60,23 @@ id=$1;
 raw_nii=$2;
 no_cleanup=$3;
 
+# --- folder→file normalization (must run BEFORE any Bvec/Bval logic) ---
+if [[ -d "$raw_nii" ]]; then
+  echo "[auto] Directory input: $raw_nii"
+  mapfile -t _nii < <(find "$raw_nii" -maxdepth 1 -type f \( -iname "*.nii" -o -iname "*.nii.gz" \) \
+                      -printf "%s\t%p\n" | sort -nr | awk 'NR<=2{print $2}')
+  if [[ ${#_nii[@]} -lt 1 ]]; then
+    echo "[ERR] No NIfTI files in $raw_nii"; exit 2
+  fi
+  # Largest → main; second largest → reverse (if present)
+  raw_nii="${_nii[0]}"
+  revpe="${_nii[1]:-}"
+  echo "[auto] main DWI: $raw_nii"
+  [[ -n "$revpe" ]] && echo "[auto] reverse: $revpe"
+fi
+
+
+
 if [[ "x1x" == "x${no_cleanup}x" ]];then
     cleanup=0;
 else
