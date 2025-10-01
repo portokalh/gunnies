@@ -95,14 +95,14 @@ run_extractdiffdirs() {
   _try_local() {
     local mode="$1" space="$2"
     echo "[BXH] local: ${mode}vectors --space ${space} --writebvals"
-    "$EXTRACT_BIN" "$bxh_file" "$out_vec" "$out_bval" "--${mode}vectors" --space "$space" --writebvals
+    "$EXTRACT_BIN" "$bxh_file" "$out_vec" "$out_bval" "--${mode}vectors" --space "$space" --writebvals --fieldsep=\t
   }
 
   _try_remote() {
     local mode="$1" space="$2"
-    echo "[BXH] remote ${remote_host}: ${mode}vectors --space ${space} --writebvals"
+    echo "[BXH] remote ${remote_host}: ${mode}vectors --space ${space} --writebvals --fieldsep=\t"
     ssh $remote_opts "$remote_host" \
-      "extractdiffdirs '$bxh_file' '${out_vec}' '${out_bval}' '--${mode}vectors' --space '$space' --writebvals"
+      "extractdiffdirs '$bxh_file' '${out_vec}' '${out_bval}' '--${mode}vectors' --space '$space' --writebvals --fieldsep=\t"
   }
 
   # ---------- LOCAL ----------
@@ -132,7 +132,7 @@ run_extractdiffdirs() {
   echo "[ERR] BXH extraction did not produce BOTH ${out_vec} and ${out_bval}."
   return 4
 }
-
+s
 # Process name
 proc_name="diffusion_prep_MRtrix"
 
