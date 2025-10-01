@@ -73,7 +73,7 @@ run_extractdiffdirs() {
   # ---- LOCAL ----
   if [[ -n "$EXTRACT_BIN" ]]; then
     echo "[BXH] Local: $EXTRACT_BIN --rowvectors"
-    if "$EXTRACT_BIN" "$bxh_file" "$out_prefix" --rowvectors; then
+    if "$EXTRACT_BIN" "$bxh_file" "$out_prefix" --rowvectors --writebvals ; then
       if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
         echo "[BXH] OK (local, rowvectors)"; return 0
       fi
@@ -82,7 +82,7 @@ run_extractdiffdirs() {
       echo "[BXH] Local rowvectors failed → try colvectors"
     fi
     echo "[BXH] Local: $EXTRACT_BIN --colvectors (then transpose)"
-    if "$EXTRACT_BIN" "$bxh_file" "$out_prefix" --colvectors; then
+    if "$EXTRACT_BIN" "$bxh_file" "$out_prefix" --colvectors --writebvals ; then
       if [[ -s "${out_prefix}.bvec" ]]; then
         awk '{
           for(i=1;i<=NF;i++) a[NR,i]=$i
