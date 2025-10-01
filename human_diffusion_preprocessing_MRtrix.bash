@@ -57,82 +57,57 @@ _resolve_extract_bin() {
     echo ""
   fi
 }
-
-# BXH extractor with rowvectors (FSL-style); fallback to colvectors->transpose; remote-capable
-# Always produce BOTH .bvec and .bval from BXH (no synthesis); fail if missing.
+ 
+# Use BXH to produce BOTH .bvec and .bval (no synthesis). Fail if missing.
 run_extractdiffdirs() {
-  local bxh_file="$1"; local out_prefix="$2"
-  local remote_host="${REMOTE_HOST:-andros}"
-  local remote_opts="${SSH_OPTS:--o BatchMode=yes -o ConnectTimeout=6}"
-  local allow_ssh="${ALLOW_SSH:-1}"
+  local bxh_file="$1"     # e.g. /path/subj/run.bxh
+  local out_bvec="$2"     # e.g. /path/subj/run.bvec   (FULL path, not prefix)
+  local out_bval="$3"     # e.g. /path/subj/run.bval
+
+  # Prefer your venv-backed wrapper
+  export PATH=/usr/local/bin:$PATH
 
   [[ -f "$bxh_file" ]] || { echo "[ERR] BXH not found: $bxh_file"; return 2; }
-  [[ -n "$out_prefix" ]] || { echo "[ERR] Missing out_prefix"; return 2; }
+  [[ -n "$out_bvec" && -n "$out_bval" ]] || { echo "[ERR] need explicit out_bvec & out_bval"; return 2; }
+  mkdir -p "$(dirname "$out_bvec")"
+  rm -f "$out_bvec" "$out_bval"  # avoid "exists" aborts
 
-  # explicit outputs required by your BXH CLI
-  local out_vec="${out_prefix}.bvec"
-  local out_bval="${out_prefix}.bval"
-  rm -f "$out_vec" "$out_bval"  # avoid "exists" error
-
-  # ensure the wrapper wins
-  export PATH=/usr/local/bin:$PATH
-  local EXTRACT_BIN=""
-  if [[ -x /usr/local/bin/extractdiffdirs ]]; then
-    EXTRACT_BIN=/usr/local/bin/extractdiffdirs
-  elif command -v extractdiffdirs >/dev/null 2>&1; then
-    EXTRACT_BIN="$(command -v extractdiffdirs)"
+  echo "[BXH] extractdiffdirs --colvectors --writebvals --fieldsep=\\t --space=RAI '$bxh_file' '$out_bvec' '$out_bval'"
+  if ! extractdiffdirs \
+        --colvectors \
+        --writebvals \
+        --fieldsep=\t \
+        --space=RAI \
+        "$bxh_file" "$out_bvec" "$out_bval"; then
+    echo "[ERR] extractdiffdirs failed"
+    return 3
   fi
 
-  _ok() { [[ -s "$out_vec" && -s "$out_bval" ]]; }
+  # Verify outputs exist & look like FSL-format bvec (3 x N) and bval (1 x N)
+  [[ -s "$out_bvec" && -s "$out_bval" ]] || { echo "[ERR] BXH did not write both outputs"; return 4; }
 
-  _transpose_to_rows() {
-    local f="$1"
-    awk '{ for(i=1;i<=NF;i++) a[NR,i]=$i } NF>p{p=NF}
-         END{ for(j=1;j<=p;j++){ out=""; for(i=1;i<=NR;i++){ out=out (i==1?"":" ") a[i,j] } print out } }' \
-      "$f" > "${f}.tmp" && mv -f "${f}.tmp" "$f"
-  }
+  local r c bc
+  r=$(awk 'END{print NR}' "$out_bvec")
+  c=$(awk 'NR==1{print NF; exit}' "$out_bvec")
+  bc=$(awk 'NR==1{print NF; exit}' "$out_bval")
 
-  _try_local() {
-    local mode="$1" space="$2"
-    echo "[BXH] local: ${mode}vectors --space ${space} --writebvals"
-    "$EXTRACT_BIN" "$bxh_file" "$out_vec" "$out_bval" "--${mode}vectors" --space "$space" --writebvals --fieldsep='\t'
-  }
-
-  _try_remote() {
-    local mode="$1" space="$2"
-    echo "[BXH] remote ${remote_host}: ${mode}vectors --space ${space} --writebvals --fieldsep='\t'"
-    ssh $remote_opts "$remote_host" \
-      "extractdiffdirs '$bxh_file' '${out_vec}' '${out_bval}' '--${mode}vectors' --space '$space' --writebvals --fieldsep='\t'"
-  }
-
-  # ---------- LOCAL ----------
-  if [[ -n "$EXTRACT_BIN" ]]; then
-    _try_local row image || _try_local row RAS || true
-    if ! _ok; then
-      _try_local col image || _try_local col RAS || true
-      [[ -s "$out_vec" ]] && _transpose_to_rows "$out_vec"
-    fi
-    if _ok; then echo "[BXH] OK (local)"; return 0; fi
-    echo "[BXH] Local extraction failed."
-  else
-    echo "[BXH] extractdiffdirs not found locally."
+  if [[ "$r" -ne 3 ]]; then
+    echo "[ERR] bvec is ${r}x${c}; expected 3xN (colvectors yields 3 rows)."
+    return 5
   fi
 
-  # ---------- REMOTE (optional) ----------
-  if [[ "$allow_ssh" -eq 1 ]] && ssh $remote_opts "$remote_host" 'command -v extractdiffdirs >/dev/null 2>&1'; then
-    _try_remote row image || _try_remote row RAS || true
-    if ! _ok; then
-      _try_remote col image || _try_remote col RAS || true
-      [[ -s "$out_vec" ]] && _transpose_to_rows "$out_vec"
-    fi
-    if _ok; then echo "[BXH] OK (remote)"; return 0; fi
-    echo "[BXH] Remote extraction failed."
+  # optional: check volume count matches file’s dim4 (warn only)
+  if command -v fslval >/dev/null 2>&1; then
+    local nvol; nvol=$(fslval "${raw_nii:-$bxh_file}" dim4 2>/dev/null || echo "")
+    [[ -n "$nvol" && "$c" -ne "$nvol" ]] && echo "[warn] bvec cols ($c) != volumes ($nvol)"
+    [[ -n "$nvol" && "$bc" -ne "$nvol" ]] && echo "[warn] bval cols ($bc) != volumes ($nvol)"
   fi
 
-  echo "[ERR] BXH extraction did not produce BOTH ${out_vec} and ${out_bval}."
-  return 4
+  echo "[BXH] OK -> $out_bvec / $out_bval (3x$c, 1x$bc)"
+  return 0
 }
-s
+  
+
 # Process name
 proc_name="diffusion_prep_MRtrix"
 
