@@ -216,7 +216,7 @@ else
 	else
 	  EXTRACT_BIN=$(_resolve_extract_bin)
 	  if [[ -n "$EXTRACT_BIN" ]]; then
-		"$EXTRACT_BIN" --colvectors --writebvals --fieldsep='\t' --space=RAI \
+		"$EXTRACT_BIN" --colvectors --writebvals --fieldsep=\'\t\' --space=RAI \
 		  "$bxh_file" "$src_bvec" "$src_bval" \
 		  || { echo "[ERR] extractdiffdirs failed"; exit 1; }
 	  else
