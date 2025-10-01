@@ -350,6 +350,51 @@ if [[ ! -f ${debiased} ]]; then
         fi
       fi
 
+# === Build a 2-volume SE-EPI pair (main b0 + reverse b0) ===
+se_epi="${work_dir}/${id}_rev_seepi_pair.nii.gz"
+
+		# 1) main b0 (from your degibbs’d DWI)
+		b0_main="${work_dir}/${id}_b0_main.nii.gz"
+		if command -v dwiextract >/dev/null 2>&1; then
+		  # robust: extract b=0 via MRtrix, then take first volume
+		  dwiextract -bzero "${degibbs}" - | mrconvert - "${b0_main}" -strides +1,+2,+3,+4 -force
+		  # ensure single volume
+		  if [[ "$(fslval "${b0_main}" dim4)" -gt 1 ]]; then
+			fslroi "${b0_main}" "${b0_main}" 0 1
+		  fi
+		else
+		  # fallback: take first b0 index from the FSL bvals you already wrote
+		  if [[ -s "${bvals}" ]]; then
+			idx_b0=$(awk '{for(i=1;i<=NF;i++) if ($i<50){print i-1; exit}}' "${bvals}")
+			[[ -z "${idx_b0}" ]] && idx_b0=0
+		  else
+			idx_b0=0
+		  fi
+		  fslroi "${raw_nii}" "${b0_main}" "${idx_b0}" 1
+		fi
+		
+		# 2) reverse b0 (from your reverse-PE NIfTI)
+		b0_rev="${work_dir}/${id}_b0_rev.nii.gz"
+		if [[ -n "${revpe:-}" && -f "${revpe}" ]]; then
+		  nrev=$(fslval "${revpe}" dim4 2>/dev/null || echo 1)
+		  if [[ "${nrev}" -gt 1 ]]; then
+			# take first volume (typically b0)
+			fslroi "${revpe}" "${b0_rev}" 0 1
+		  else
+			cp -f "${revpe}" "${b0_rev}"
+		  fi
+		else
+		  echo "[ERR] -rpe_pair requested but reverse-phase EPI not found"; exit 1
+		fi
+		
+		# 3) merge into a 2-volume SE-EPI pair
+		fslmerge -t "${se_epi}" "${b0_main}" "${b0_rev}"
+		nev=$(fslval "${se_epi}" dim4 2>/dev/null || echo 0)
+		if [[ "${nev}" -lt 2 || $((nev % 2)) -ne 0 ]]; then
+		  echo "[ERR] se_epi must contain an even number of vols (got ${nev})"; exit 1
+		fi
+		echo "[stage 04] SE-EPI pair ready: ${se_epi} (vols=${nev})"
+
       if [[ -n "$se_epi" && -n "${readout_time:-}" ]]; then
         echo "[stage 04] Using TOPUP+EDDY with -rpe_pair (pe_dir=${pe_dir_main}, readout=${readout_time}s)."
         dwifslpreproc ${degibbs} ${preprocessed} \
