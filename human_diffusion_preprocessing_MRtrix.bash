@@ -95,14 +95,14 @@ run_extractdiffdirs() {
   _try_local() {
     local mode="$1" space="$2"
     echo "[BXH] local: ${mode}vectors --space ${space} --writebvals"
-    "$EXTRACT_BIN" "$bxh_file" "$out_vec" "$out_bval" "--${mode}vectors" --space "$space" --writebvals --fieldsep=\t
+    "$EXTRACT_BIN" "$bxh_file" "$out_vec" "$out_bval" "--${mode}vectors" --space "$space" --writebvals --fieldsep='\t'
   }
 
   _try_remote() {
     local mode="$1" space="$2"
-    echo "[BXH] remote ${remote_host}: ${mode}vectors --space ${space} --writebvals --fieldsep=\t"
+    echo "[BXH] remote ${remote_host}: ${mode}vectors --space ${space} --writebvals --fieldsep='\t'"
     ssh $remote_opts "$remote_host" \
-      "extractdiffdirs '$bxh_file' '${out_vec}' '${out_bval}' '--${mode}vectors' --space '$space' --writebvals --fieldsep=\t"
+      "extractdiffdirs '$bxh_file' '${out_vec}' '${out_bval}' '--${mode}vectors' --space '$space' --writebvals --fieldsep='\t'"
   }
 
   # ---------- LOCAL ----------
