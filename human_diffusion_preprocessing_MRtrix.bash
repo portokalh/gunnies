@@ -322,7 +322,7 @@ if [[ ! -f ${debiased} ]]; then
       # quick mask
       if [[ ! -f ${temp_mask} ]]; then dwi2mask ${degibbs} ${temp_mask}; fi
       mask_string=' '
-      [[ -f ${temp_mask} ]] && mask_string=" -mask ${temp_mask} "
+      [[ -f ${temp_mask} ]] && mask_string=" -eddy_mask ${temp_mask} "
 
       eddy_opts='--repol --slm=linear'
       n_shells=$(mrinfo -shell_bvalues ${degibbs} | wc -w)
