@@ -175,12 +175,9 @@ fi
 echo "Processing diffusion data with runno/id: ${id}."
 
 # Always use FSL branch
-use_fsl=1
-if ((${use_fsl})); then
-  work_dir=${BD}/${proc_name}_${id}
-else
-  work_dir=${BD}/${proc_name}_with_coreg_${id}
-fi
+use_fsl=1	
+work_dir=${BD}/${proc_name}_${id}
+
 echo "Work directory: ${work_dir}"
 [[ -d ${work_dir} ]] || mkdir -pm 775 ${work_dir}
 
@@ -212,19 +209,23 @@ else
   fi
   if [[ -n "$bxh_file" && -f "$bxh_file" ]]; then
     echo "[auto] BXH found: $bxh_file"
-    if declare -f run_extractdiffdirs >/dev/null 2>&1; then
-      run_extractdiffdirs "$bxh_file" "$main_base" || echo "[warn] run_extractdiffdirs failed"
-    else
-      EXTRACT_BIN=$(_resolve_extract_bin)
-      if [[ -n "$EXTRACT_BIN" ]]; then
-        "$EXTRACT_BIN" "$bxh_file" "$main_base" --rowvectors || echo "[warn] extractdiffdirs failed"
-      else
-        echo "[warn] extractdiffdirs not available and no helper; cannot extract from BXH."
-      fi
-    fi
-    src_bvec="${main_base}.bvec"
-    src_bval="${main_base}.bval"
-    [[ -s "$src_bvec" && -s "$src_bval" ]] && have_grads=1
+	if declare -f run_extractdiffdirs >/dev/null 2>&1; then
+	  # Use explicit outputs + your proven flags; fail hard if both files aren’t written
+	  run_extractdiffdirs "$bxh_file" "$src_bvec" "$src_bval" \
+		|| { echo "[ERR] BXH extraction failed"; exit 1; }
+	else
+	  EXTRACT_BIN=$(_resolve_extract_bin)
+	  if [[ -n "$EXTRACT_BIN" ]]; then
+		"$EXTRACT_BIN" --colvectors --writebvals --fieldsep=$'\t' --space=RAI \
+		  "$bxh_file" "$src_bvec" "$src_bval" \
+		  || { echo "[ERR] extractdiffdirs failed"; exit 1; }
+	  else
+		echo "[ERR] extractdiffdirs not available and no helper; cannot extract from BXH."
+		exit 1
+	  fi
+	fi
+	[[ -s "$src_bvec" && -s "$src_bval" ]] && have_grads=1
+
   else
     echo "[note] No BXH sibling found for ${main_nii}; skipping BXH extraction."
   fi
