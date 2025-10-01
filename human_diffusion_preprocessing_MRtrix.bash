@@ -59,92 +59,77 @@ _resolve_extract_bin() {
 }
 
 # BXH extractor with rowvectors (FSL-style); fallback to colvectors->transpose; remote-capable
+# Always produce BOTH .bvec and .bval from BXH (no synthesis); fail if missing.
 run_extractdiffdirs() {
   local bxh_file="$1"; local out_prefix="$2"
   local remote_host="${REMOTE_HOST:-andros}"
   local remote_opts="${SSH_OPTS:--o BatchMode=yes -o ConnectTimeout=6}"
-  local need_scp="${REMOTE_SCP:-auto}"  # auto|on|off
+  local allow_ssh="${ALLOW_SSH:-1}"
+
   [[ -f "$bxh_file" ]] || { echo "[ERR] BXH not found: $bxh_file"; return 2; }
   [[ -n "$out_prefix" ]] || { echo "[ERR] Missing out_prefix"; return 2; }
-  local out_dir; out_dir="$(dirname "$out_prefix")"; local out_base; out_base="$(basename "$out_prefix")"; mkdir -p "$out_dir"
 
-  local EXTRACT_BIN; EXTRACT_BIN=$(_resolve_extract_bin)
+  # explicit outputs required by your BXH CLI
+  local out_vec="${out_prefix}.bvec"
+  local out_bval="${out_prefix}.bval"
+  rm -f "$out_vec" "$out_bval"  # avoid "exists" error
 
-  # ---- LOCAL ----
+  # ensure the wrapper wins
+  export PATH=/usr/local/bin:$PATH
+  local EXTRACT_BIN=""
+  if [[ -x /usr/local/bin/extractdiffdirs ]]; then
+    EXTRACT_BIN=/usr/local/bin/extractdiffdirs
+  elif command -v extractdiffdirs >/dev/null 2>&1; then
+    EXTRACT_BIN="$(command -v extractdiffdirs)"
+  fi
+
+  _ok() { [[ -s "$out_vec" && -s "$out_bval" ]]; }
+
+  _transpose_to_rows() {
+    local f="$1"
+    awk '{ for(i=1;i<=NF;i++) a[NR,i]=$i } NF>p{p=NF}
+         END{ for(j=1;j<=p;j++){ out=""; for(i=1;i<=NR;i++){ out=out (i==1?"":" ") a[i,j] } print out } }' \
+      "$f" > "${f}.tmp" && mv -f "${f}.tmp" "$f"
+  }
+
+  _try_local() {
+    local mode="$1" space="$2"
+    echo "[BXH] local: ${mode}vectors --space ${space} --writebvals"
+    "$EXTRACT_BIN" "$bxh_file" "$out_vec" "$out_bval" "--${mode}vectors" --space "$space" --writebvals
+  }
+
+  _try_remote() {
+    local mode="$1" space="$2"
+    echo "[BXH] remote ${remote_host}: ${mode}vectors --space ${space} --writebvals"
+    ssh $remote_opts "$remote_host" \
+      "extractdiffdirs '$bxh_file' '${out_vec}' '${out_bval}' '--${mode}vectors' --space '$space' --writebvals"
+  }
+
+  # ---------- LOCAL ----------
   if [[ -n "$EXTRACT_BIN" ]]; then
-    echo "[BXH] Local: $EXTRACT_BIN --rowvectors"
-    if "$EXTRACT_BIN" "$bxh_file" "$out_prefix" --rowvectors --writebvals ; then
-      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-        echo "[BXH] OK (local, rowvectors)"; return 0
-      fi
-      echo "[BXH] Local rowvectors ran but outputs missing → try colvectors"
-    else
-      echo "[BXH] Local rowvectors failed → try colvectors"
+    _try_local row image || _try_local row RAS || true
+    if ! _ok; then
+      _try_local col image || _try_local col RAS || true
+      [[ -s "$out_vec" ]] && _transpose_to_rows "$out_vec"
     fi
-    echo "[BXH] Local: $EXTRACT_BIN --colvectors (then transpose)"
-    if "$EXTRACT_BIN" "$bxh_file" "$out_prefix" --colvectors --writebvals ; then
-      if [[ -s "${out_prefix}.bvec" ]]; then
-        awk '{
-          for(i=1;i<=NF;i++) a[NR,i]=$i
-        }
-        NF>p{p=NF}
-        END{
-          for(j=1;j<=p;j++){
-            out=""
-            for(i=1;i<=NR;i++){ out=out (i==1?"":" ") a[i,j] }
-            print out
-          }
-        }' "${out_prefix}.bvec" > "${out_prefix}.bvec.tmp" && mv -f "${out_prefix}.bvec.tmp" "${out_prefix}.bvec"
-      fi
-      if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-        echo "[BXH] OK (local, col→rows)"; return 0
-      fi
-      echo "[BXH] Local colvectors ran but outputs missing."
-    else
-      echo "[BXH] Local colvectors failed."
-    fi
+    if _ok; then echo "[BXH] OK (local)"; return 0; fi
+    echo "[BXH] Local extraction failed."
   else
     echo "[BXH] extractdiffdirs not found locally."
   fi
 
-  # ---- REMOTE ----
-  if [[ "${ALLOW_SSH:-1}" -eq 1 ]]; then
-    echo "[BXH] checking remote ${remote_host} …"
-    if ssh $remote_opts "$remote_host" 'command -v extractdiffdirs >/dev/null 2>&1'; then
-      echo "[BXH] Remote: extractdiffdirs --rowvectors"
-      if ssh $remote_opts "$remote_host" "extractdiffdirs '$bxh_file' '$out_prefix' --rowvectors"; then
-        if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-          echo "[BXH] OK (remote, shared FS)"; return 0
-        fi
-        if [[ "$need_scp" == "auto" || "$need_scp" == "on" ]]; then
-          echo "[BXH] scp back results from ${remote_host}"
-          scp $remote_opts "${remote_host}:${out_prefix}.bvec" "${out_dir}/${out_base}.bvec" || true
-          scp $remote_opts "${remote_host}:${out_prefix}.bval" "${out_dir}/${out_base}.bval" || true
-          [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]] && { echo "[BXH] OK (remote→scp)"; return 0; }
-        fi
-        echo "[BXH] Remote ran rowvectors, outputs not visible locally."
-      else
-        echo "[BXH] Remote rowvectors failed → try colvectors"
-        ssh $remote_opts "$remote_host" "extractdiffdirs '$bxh_file' '$out_prefix' --colvectors" || true
-        if [[ -s "${out_prefix}.bvec" && -s "${out_prefix}.bval" ]]; then
-          awk '{
-            for(i=1;i<=NF;i++) a[NR,i]=$i
-          }
-          NF>p{p=NF}
-          END{
-            for(j=1;j<=p;j++){
-              out=""
-              for(i=1;i<=NR;i++){ out=out (i==1?"":" ") a[i,j] }
-              print out
-            }
-          }' "${out_prefix}.bvec" > "${out_prefix}.bvec.tmp" && mv -f "${out_prefix}.bvec.tmp" "${out_prefix}.bvec"
-          echo "[BXH] OK (remote, col→rows)"; return 0
-        fi
-      fi
-    else
-      echo "[BXH] extractdiffdirs not available on ${remote_host} (or SSH failed)."
+  # ---------- REMOTE (optional) ----------
+  if [[ "$allow_ssh" -eq 1 ]] && ssh $remote_opts "$remote_host" 'command -v extractdiffdirs >/dev/null 2>&1'; then
+    _try_remote row image || _try_remote row RAS || true
+    if ! _ok; then
+      _try_remote col image || _try_remote col RAS || true
+      [[ -s "$out_vec" ]] && _transpose_to_rows "$out_vec"
     fi
+    if _ok; then echo "[BXH] OK (remote)"; return 0; fi
+    echo "[BXH] Remote extraction failed."
   fi
+
+  echo "[ERR] BXH extraction did not produce BOTH ${out_vec} and ${out_bval}."
   return 4
 }
 
