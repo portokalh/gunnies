@@ -391,7 +391,7 @@ se_epi="${work_dir}/${id}_rev_seepi_pair.nii.gz"
 		  test_2=$(mrinfo ${b0_rev} -size -spacing -transform | tr -s [:space:] '_');
 		  
 		  if [[ "${test_1}" != "${test_2}" ]]; then
-		  	mrgrid ${b0_rev} regrid -template ${b0_main} -interp linear ${b0_rev};
+		  	mrgrid ${b0_rev} regrid -force -template ${b0_main} -interp linear ${b0_rev};		
 		  fi
 		else
 		  echo "[ERR] -rpe_pair requested but reverse-phase EPI not found"; exit 1
