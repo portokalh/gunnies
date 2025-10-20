@@ -383,6 +383,16 @@ se_epi="${work_dir}/${id}_rev_seepi_pair.nii.gz"
 		  else
 			cp -f "${revpe}" "${b0_rev}"
 		  fi
+		  dims=$(mrinfo ${revpe} -size | wc -w)
+		  if [[ "${dims}" -gt 3 ]]; then
+		  	mrconvert ${b0_rev} -coord 3 0 -axes 0,1,2 ${b0_rev};
+		  fi
+		  test_1=$(mrinfo ${b0_main} -size -spacing -transform | tr -s [:space:] '_');
+		  test_2=$(mrinfo ${b0_rev} -size -spacing -transform | tr -s [:space:] '_');
+		  
+		  if [[ "${test_1}" != "${test_2}" ]]; then
+		  	mrgrid ${b0_rev} regrid -template ${b0_main} -interp linear ${b0_rev};
+		  fi
 		else
 		  echo "[ERR] -rpe_pair requested but reverse-phase EPI not found"; exit 1
 		fi
