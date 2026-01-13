@@ -238,4 +238,200 @@ def vfa_fit_e1_least_squares(
     b = np.full(vox, np.nan, dtype=np.float64)
 
     # OLS slope/intercept per voxel:
-    # E1 = cov(X,Y)
+    # E1 = cov(X,Y)/var(X)
+    # b  = mean(Y) - E1*mean(X)
+    Xg = X[:, good]
+    Yg = Y[:, good]
+
+    Xm = np.mean(Xg, axis=0)
+    Ym = np.mean(Yg, axis=0)
+    Xc = Xg - Xm
+    Yc = Yg - Ym
+
+    varX = np.sum(Xc * Xc, axis=0)
+    covXY = np.sum(Xc * Yc, axis=0)
+
+    # Avoid divide-by-zero (ill-conditioned when angles are too close / saturated)
+    ok = varX > 0
+    e1 = np.full(Xm.shape, np.nan, dtype=np.float64)
+    e1[ok] = covXY[ok] / varX[ok]
+    e1 = np.clip(e1, e1_min, e1_max)
+
+    bb = Ym - e1 * Xm
+
+    E1[good] = e1
+    b[good] = bb
+
+    return E1.reshape(shape), b.reshape(shape)
+
+
+def e1_to_t1(E1: np.ndarray, tr_s: float, fill: float = 0.0) -> np.ndarray:
+    T1 = np.full(E1.shape, fill, dtype=np.float64)
+    good = np.isfinite(E1) & (E1 > 0) & (E1 < 1)
+    T1[good] = -tr_s / np.log(E1[good])
+    return T1
+
+
+def load_nifti(path: str) -> Tuple[np.ndarray, nib.Nifti1Image]:
+    img = nib.load(path)
+    data = img.get_fdata(dtype=np.float32)
+    return data, img
+
+
+# -------------------------
+# CLI
+# -------------------------
+
+def parse_args():
+    ap = argparse.ArgumentParser(description="Multi-flip-angle VFA T1 mapping (2+ angles) with optional Bruker .method parsing.")
+    ap.add_argument("--imgs", nargs="+", required=True, help="List of NIfTI images at different flip angles (2 or more).")
+    ap.add_argument("--out", required=True, help="Output T1 map NIfTI (.nii or .nii.gz)")
+
+    ap.add_argument("--fas", nargs="+", type=float, default=None, help="Flip angles in degrees, same count/order as --imgs")
+    ap.add_argument("--tr", type=float, default=None, help="TR value (optional if parsed)")
+    ap.add_argument("--tr-units", choices=["s", "ms"], default="s", help="Units for --tr if provided manually (default s)")
+
+    ap.add_argument("--methods", nargs="+", default=None, help="Optional explicit .method files (same count/order as --imgs). If omitted, uses adjacent basename.method")
+
+    ap.add_argument("--mask", default=None, help="Optional binary mask NIfTI")
+    ap.add_argument("--auto-mask", action="store_true", help="Build a simple intensity mask if no --mask provided")
+    ap.add_argument("--auto-mask-frac", type=float, default=0.05, help="Auto-mask threshold fraction of 95th percentile")
+
+    ap.add_argument("--e1-min", type=float, default=1e-6)
+    ap.add_argument("--e1-max", type=float, default=0.999999)
+
+    ap.add_argument("--require-same-tr", action="store_true", help="If TR is parsed from multiple methods, require they match.")
+
+    return ap.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    if len(args.imgs) < 2:
+        raise SystemExit("ERROR: Provide at least 2 images via --imgs")
+
+    # Load images
+    vols = []
+    ref_img = None
+    for p in args.imgs:
+        v, im = load_nifti(p)
+        if ref_img is None:
+            ref_img = im
+            ref_shape = v.shape
+        else:
+            if v.shape != ref_shape:
+                raise SystemExit(f"ERROR: Shape mismatch: {p} has {v.shape}, expected {ref_shape}")
+        vols.append(v)
+
+    # Mask
+    mask = None
+    if args.mask:
+        m, _ = load_nifti(args.mask)
+        if m.shape != ref_shape:
+            raise SystemExit(f"ERROR: Mask shape {m.shape} != image shape {ref_shape}")
+        mask = (m != 0).astype(np.uint8)
+    elif args.auto_mask:
+        mask = build_default_mask(vols, frac=args.auto_mask_frac)
+
+    # Resolve TR
+    tr_s = None
+    if args.tr is not None:
+        tr_s = args.tr / 1000.0 if args.tr_units == "ms" else args.tr
+
+    # Resolve flip angles
+    fas = args.fas[:] if args.fas is not None else None
+    if fas is not None and len(fas) != len(args.imgs):
+        raise SystemExit("ERROR: --fas count must match --imgs count")
+
+    # Method files
+    methods = args.methods[:] if args.methods is not None else None
+    if methods is not None and len(methods) != len(args.imgs):
+        raise SystemExit("ERROR: --methods count must match --imgs count")
+
+    details = []
+    parsed_trs = []
+    if (tr_s is None) or (fas is None):
+        inferred_fas = []
+        for i, img_path in enumerate(args.imgs):
+            mpath = methods[i] if methods is not None else default_adjacent_method_path(img_path)
+            if not os.path.isfile(mpath):
+                details.append(f"[method {i}] not found: {mpath}")
+                inferred_fas.append(None)
+                continue
+            t, f, det = infer_tr_fa_from_method(mpath)
+            details.append(f"[method {i}] {mpath}: {det}")
+            parsed_trs.append(t)
+            inferred_fas.append(f)
+
+        if tr_s is None:
+            # Use first non-None TR
+            tr_s = next((t for t in parsed_trs if t is not None), None)
+
+        if fas is None:
+            fas = inferred_fas
+
+    # Validate TR
+    if tr_s is None:
+        raise SystemExit("ERROR: TR missing. Provide --tr or ensure method files contain TR.")
+    if tr_s <= 0:
+        raise SystemExit(f"ERROR: TR must be > 0; got {tr_s}")
+
+    # Validate FAs
+    if fas is None or any(f is None for f in fas):
+        missing_idx = [i for i, f in enumerate(fas or []) if f is None]
+        msg = [
+            "ERROR: Flip angle(s) missing.",
+            "Provide --fas (degrees) matching --imgs OR ensure method files contain flip angles.",
+            f"Missing indices: {missing_idx}",
+            "",
+            "Method parsing diagnostics:",
+            *details,
+        ]
+        raise SystemExit("\n".join(msg))
+
+    # Optional TR consistency check across methods
+    if args.require_same_tr:
+        non_none_trs = [t for t in parsed_trs if t is not None]
+        if len(non_none_trs) >= 2:
+            for t in non_none_trs[1:]:
+                if not np.isclose(non_none_trs[0], t, rtol=1e-6, atol=1e-9):
+                    raise SystemExit(
+                        "ERROR: TR mismatch across methods. Provide --tr explicitly or omit --require-same-tr.\n"
+                        + "\n".join(details)
+                    )
+
+    # Fit E1 and compute T1
+    E1, intercept = vfa_fit_e1_least_squares(
+        vols=vols,
+        fas_deg=[float(f) for f in fas],
+        mask=mask,
+        e1_min=args.e1_min,
+        e1_max=args.e1_max,
+    )
+    T1 = e1_to_t1(E1, tr_s=tr_s, fill=0.0).astype(np.float32)
+
+    out_img = nib.Nifti1Image(T1, affine=ref_img.affine, header=ref_img.header)
+    out_img.header.set_data_dtype(np.float32)
+    nib.save(out_img, args.out)
+
+    print("=== Multi-angle VFA T1 mapping ===")
+    print(f"TR  : {tr_s:.6g} s")
+    print(f"FAs : {', '.join(str(f) for f in fas)} deg")
+    print(f"Imgs: {len(args.imgs)}")
+    print(f"Out : {args.out}")
+    if args.mask:
+        print(f"Mask: {args.mask}")
+    elif args.auto_mask:
+        print(f"Mask: auto (frac={args.auto_mask_frac})")
+    else:
+        print("Mask: none")
+    if details:
+        print("--- method parsing ---")
+        for d in details:
+            print(d)
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()
