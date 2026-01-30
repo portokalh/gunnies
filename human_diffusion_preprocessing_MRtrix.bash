@@ -679,7 +679,7 @@ conn_folder=/mnt/newStor/paros//paros_WORK/${project}_connectomics/${id}_connect
 if ((! $use_fsl)); then
   conn_folder=/mnt/newStor/paros//paros_WORK/${project}_connectomics/${id}_with_coreg_connectomics
 fi
-[[ -d ${conn_folder} ]] || mkdir ${conn_folder}
+[[ -d ${conn_folder} ]] || mkdir -p ${conn_folder}
 
 distances_csv=${conn_folder}/${id}_distances.csv
 if [[ ! -f ${distances_csv} ]]; then
