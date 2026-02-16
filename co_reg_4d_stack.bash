@@ -248,7 +248,8 @@ if [[ ! -f ${reg_nii4D} ]];then
     sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
 
 	if [[ ${cluster} -eq 1 ]];then
-		job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+		#job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+		job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 	elif [[ ${cluster} -eq 2 ]];then
 		job_id=$($sub_cmd | tail -1)
 		#job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
