@@ -88,7 +88,7 @@ fi
 
 YYY=$(echo ${PH_result} |  cut -d 'x' -f4 );
 if [[ "x${YYY}" == "x" ]];then 
-	YYY=1);
+	YYY=1;
 fi
 XXX=$(expr $YYY - 1);
 
