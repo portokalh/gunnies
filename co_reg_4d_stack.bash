@@ -177,7 +177,15 @@ echo "Dispatching co-registration jobs to the cluster:";
 # Note the following line is necessarily complicated, as...
 # the common sense line ('for nn in {01..$XXX}') does not work...
 # https://stackoverflow.com/questions/169511/how-do-i-iterate-over-a-range-of-numbers-defined-by-variables-in-bash
-for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
+
+if [[ $XXX -gt 1 ]]; then
+	nn_list=$(eval echo "{${zero_pad}${start_vol}..$XXX}");
+else
+	nn_list=$start_vol;
+fi
+
+for nn in ${nn_list};do
+#for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
     # num_string=$nn;
     # if [[ $nn -lt 10 ]];then
     # num_string="0${nn}";
@@ -188,7 +196,7 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	xform_xxx="${out_prefix}0GenericAffine.mat";
 	vol_xxx_out="${work}/${job_shorthand}_${runno}_m${num_string}.${ext}";
 	reassemble_list="${reassemble_list} ${vol_xxx_out} ";
-
+	
 	name="${job_desc}_${runno}_m${num_string}";
 	sbatch_file="${sbatch_folder}/${name}.bash";
 	#source_sbatch="${BIGGUS_DISKUS}/sinha_co_reg_nii4D_qsub_master.bash";
@@ -206,7 +214,12 @@ for nn in $(eval echo "{${zero_pad}${start_vol}..$XXX}");do
 	   
 	    final_cmd="${reg_cmd};${apply_cmd}";	
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
- 	    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+	    if [[ ${cluster} -eq 1 ]];then
+		    job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+		elif [[ ${cluster} -eq 2 ]];then
+ 	    	job_id=$($sub_cmd | tail -1)
+ 	    	#job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+		fi
 			
 	    if ((! $?));then
 			jid_list="${jid_list}${job_id},";
@@ -230,8 +243,12 @@ if [[ ! -f ${reg_nii4D} ]];then
     name="assemble_nii4D_${job_desc}_${runno}_m${zeros}";
     sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 ${jid_list} ${assemble_cmd}";
 
-	job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
-				
+	if [[ ${cluster} -eq 1 ]];then
+		job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+	elif [[ ${cluster} -eq 2 ]];then
+		job_id=$($sub_cmd | tail -1)
+		#job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
+	fi	
     echo "JOB ID = ${job_id}; Job Name = ${name}";
 	if ((! $?));then
 		return_code=${job_id};
