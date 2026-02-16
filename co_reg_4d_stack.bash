@@ -231,7 +231,7 @@ for nn in ${nn_list};do
 	   
 	fi
 done
-
+jid_list=${jid_list%,};
 #Trim trailing comma from job id list:
 if ((${jid_list}));then
     jid_list=${jid_list%,};
