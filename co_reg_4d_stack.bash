@@ -88,10 +88,10 @@ fi
 
 YYY=$(echo ${PH_result} |  cut -d 'x' -f4 );
 if [[ "x${YYY}" == "x" ]];then 
-	XXX=$(expr 1 - 1);
-else
-	XXX=$(expr $YYY - 1);
+	YYY=1);
 fi
+XXX=$(expr $YYY - 1);
+
 
 declare -i XXX;
 
@@ -218,7 +218,8 @@ for nn in ${nn_list};do
 	    final_cmd="${reg_cmd};${apply_cmd}";	
 	    sub_cmd="${sub_script} ${sbatch_folder} ${name} 0 0 ${final_cmd}";
 	    if [[ ${cluster} -eq 1 ]];then
-		    job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+		    #job_id=$(${sub_cmd} | cut -d ' ' -f 4);
+		    job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
 		elif [[ ${cluster} -eq 2 ]];then
  	    	job_id=$($sub_cmd | tail -1)
  	    	#job_id=$(${sub_cmd} | tail -1 | cut -d ';' -f1 | cut -d ' ' -f4);
