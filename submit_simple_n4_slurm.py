@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +25,10 @@ def submit_job(script_path: Path):
 
 
 def parse_job_id(stdout: str) -> str:
-    return stdout.strip().split(";")[0]
+    m = re.match(r"^(\d+)", stdout.strip())
+    if not m:
+        raise RuntimeError(f"Could not parse job id from: {stdout}")
+    return m.group(1)
 
 
 def build_job_script(
@@ -37,11 +41,13 @@ def build_job_script(
     method_out: Path | None,
     sbatch_dir: Path,
     n4_path: str,
+    imagemath_path: str,
     dimension: int,
     shrink_factor: int,
     convergence: str,
     bspline: str,
     histogram_sharpening: str,
+    mask_dilate_iters: int,
     threads: int,
     cpus: int,
     mem_gb: int,
@@ -82,6 +88,9 @@ output_nii={shell_quote(str(output_nii))}
 bias_nii={shell_quote(str(bias_nii))}
 overwrite_flag={"1" if overwrite else "0"}
 
+n4_exe={shell_quote(n4_path)}
+imagemath_exe={shell_quote(imagemath_path)}
+
 """
 
     if mask_nii is not None:
@@ -100,7 +109,6 @@ overwrite_flag={"1" if overwrite else "0"}
         script += 'method_out=""\n'
 
     script += f"""
-n4_exe={shell_quote(n4_path)}
 
 if [[ ! -f "$input_nii" ]]; then
     echo "ERROR: Missing input: $input_nii"
@@ -118,16 +126,30 @@ cmd=(
     "$n4_exe"
     -d {dimension}
     -i "$input_nii"
+)
+
 """
 
     if mask_nii is not None:
-        script += """
+        script += f"""
 if [[ ! -f "$mask_nii" ]]; then
     echo "ERROR: Missing mask: $mask_nii"
     exit 1
 fi
 
-cmd+=( -x "$mask_nii" )
+dilated_mask="$(dirname "$mask_nii")/$(basename "$mask_nii" .nii.gz)_dilated_tmp.nii.gz"
+
+echo
+echo "Dilating mask..."
+"$imagemath_exe" {dimension} "$dilated_mask" MD "$mask_nii" {mask_dilate_iters}
+
+if [[ ! -f "$dilated_mask" ]]; then
+    echo "ERROR: Failed to create dilated mask."
+    exit 1
+fi
+
+cmd+=( -x "$dilated_mask" )
+
 """
 
     script += f"""
@@ -141,13 +163,14 @@ cmd+=(
 )
 
 echo
-echo "Running N4:"
+echo "Running N4BiasFieldCorrection:"
 printf '  %q' "${{cmd[@]}}"
 echo
+
 "${{cmd[@]}}"
 
 if [[ ! -f "$output_nii" ]]; then
-    echo "ERROR: Missing output NIfTI."
+    echo "ERROR: Missing output image."
     exit 1
 fi
 
@@ -155,6 +178,14 @@ if [[ -n "$method_in" && -f "$method_in" && -n "$method_out" ]]; then
     cp -f "$method_in" "$method_out"
 fi
 
+"""
+
+    if mask_nii is not None:
+        script += """
+rm -f "$dilated_mask"
+"""
+
+    script += """
 echo
 echo "===== JOB END ====="
 date
@@ -168,11 +199,7 @@ def main():
         description="Submit Slurm N4 jobs for matching NIfTIs in ONE folder (non-recursive)."
     )
 
-    p.add_argument(
-        "--input_dir",
-        required=True,
-        help="Folder containing input NIfTIs",
-    )
+    p.add_argument("--input_dir", required=True)
 
     p.add_argument(
         "--input_pattern",
@@ -189,18 +216,27 @@ def main():
     p.add_argument(
         "--output_suffix",
         default="_bfc",
-        help='Inserted before ".nii.gz"',
     )
 
     p.add_argument(
         "--bias_suffix",
         default="_biasfield",
-        help='Inserted before ".nii.gz"',
+    )
+
+    p.add_argument(
+        "--mask_dilate_iters",
+        type=int,
+        default=4,
     )
 
     p.add_argument(
         "--n4_path",
         default="N4BiasFieldCorrection",
+    )
+
+    p.add_argument(
+        "--imagemath_path",
+        default="ImageMath",
     )
 
     p.add_argument("--dimension", type=int, default=3)
@@ -242,7 +278,6 @@ def main():
     sbatch_dir = input_dir / "sbatch"
     sbatch_dir.mkdir(parents=True, exist_ok=True)
 
-    # IMPORTANT:
     # NON-RECURSIVE
     nifti_paths = sorted(input_dir.glob(args.input_pattern))
 
@@ -276,7 +311,6 @@ def main():
         method_in = input_nii.with_name(f"{stem}.method")
         method_out = output_nii.with_suffix("").with_suffix(".method")
 
-        # optional mask
         mask_nii = None
 
         if args.mask_pattern is not None:
@@ -296,6 +330,7 @@ def main():
             prefix = name.replace(token, "")
 
             mask_name = args.mask_pattern.replace("*", prefix)
+
             mask_nii = input_dir / mask_name
 
             if not mask_nii.exists():
@@ -315,11 +350,13 @@ def main():
             method_out=method_out,
             sbatch_dir=sbatch_dir,
             n4_path=args.n4_path,
+            imagemath_path=args.imagemath_path,
             dimension=args.dimension,
             shrink_factor=args.shrink_factor,
             convergence=args.convergence,
             bspline=args.bspline,
             histogram_sharpening=args.histogram_sharpening,
+            mask_dilate_iters=args.mask_dilate_iters,
             threads=args.threads,
             cpus=args.cpus,
             mem_gb=args.mem_gb,
@@ -340,15 +377,19 @@ def main():
 
         if rc != 0:
             eprint(f"[SUBMIT FAIL] {input_nii.name}")
+
             if stdout:
                 eprint(stdout)
+
             if stderr:
                 eprint(stderr)
+
             continue
 
         job_id = parse_job_id(stdout)
 
         final_script = sbatch_dir / f"{job_id}_{job_name}.sbatch"
+
         tmp_script.rename(final_script)
 
         print(f"[SUBMITTED] {input_nii.name}")
