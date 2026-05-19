@@ -140,7 +140,8 @@ fi
 dilated_mask="$(dirname "$mask_nii")/$(basename "$mask_nii" .nii.gz)_dilated_tmp.nii.gz"
 
 echo
-echo "Dilating mask..."
+echo "Dilating mask ({mask_dilate_iters} iterations)..."
+
 "$imagemath_exe" {dimension} "$dilated_mask" MD "$mask_nii" {mask_dilate_iters}
 
 if [[ ! -f "$dilated_mask" ]]; then
@@ -226,7 +227,8 @@ def main():
     p.add_argument(
         "--mask_dilate_iters",
         type=int,
-        default=4,
+        default=3,
+        help="Number of dilation iterations for supplied masks",
     )
 
     p.add_argument(
@@ -315,21 +317,17 @@ def main():
 
         if args.mask_pattern is not None:
 
-            if "*" not in args.input_pattern:
-                raise RuntimeError(
-                    "input_pattern must contain '*' when using mask_pattern"
-                )
+            input_regex = re.escape(args.input_pattern)
+            input_regex = input_regex.replace("\\*", "(.*)")
+            m = re.match(input_regex, name)
 
-            token = args.input_pattern.replace("*", "")
+            if not m:
+                eprint(f"[SKIP] Could not parse wildcard from: {name}")
+                continue
 
-            if token not in name:
-                raise RuntimeError(
-                    f"Could not map mask pattern for {name}"
-                )
+            wildcard_text = m.group(1)
 
-            prefix = name.replace(token, "")
-
-            mask_name = args.mask_pattern.replace("*", prefix)
+            mask_name = args.mask_pattern.replace("*", wildcard_text)
 
             mask_nii = input_dir / mask_name
 
