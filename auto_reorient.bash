@@ -2,25 +2,60 @@
 
 set -euo pipefail
 
+############################################
+# Defaults
+############################################
+
+transform_exec="/home/apps/matlab_execs_for_SAMBA/img_transform_executable/run_img_transform_exec.sh"
+mcr="/home/apps/MATLAB2015b_runtime/v90"
+
+############################################
+# Usage
+############################################
+
 usage() {
-    cat <<EOF
+
+cat <<EOF
 
 Usage:
-    $(basename "$0") <input_dir> <output_dir> <output_orientation_or_mask> <mask> [T2]
+    $(basename "$0") \\
+        --mask <mask.nii.gz> \\
+        --orientation <ALS | reference_mask.nii.gz> \\
+        --output_dir <output_dir> \\
+        --files <file1,file2,file3>
 
-Arguments:
-    input_dir                  Input directory (currently informational)
-    output_dir                 Output directory
-    output_orientation_or_mask Either:
-                                 - valid 3-letter orientation (e.g. ALS, RPI, LPS)
-                                 - OR a mask/image whose orientation will be inferred
-    mask                       Input mask image (required)
-    T2                         Input T2 image (optional)
+Required:
+    --mask
+        Input mask used to determine current orientation
+
+    --orientation
+        Either:
+            - valid 3-letter orientation (ALS, RPI, LPS, etc)
+            - OR reference image/mask whose orientation will be inferred
+
+    --output_dir
+        Output directory
+
+Optional:
+    --files
+        Comma-delimited list of additional files to reorient
+        The mask itself is ALWAYS reoriented automatically
 
 Examples:
-    $(basename "$0") ./input ./output ALS brain_mask.nii.gz T2.nii.gz
 
-    $(basename "$0") ./input ./output reference_mask.nii.gz brain_mask.nii.gz
+    Explicit orientation:
+    $(basename "$0") \\
+        --mask brain_mask.nii.gz \\
+        --orientation ALS \\
+        --output_dir reoriented \\
+        --files T2.nii.gz,DWI.nii.gz
+
+    Reference image orientation:
+    $(basename "$0") \\
+        --mask brain_mask.nii.gz \\
+        --orientation reference_mask.nii.gz \\
+        --output_dir reoriented \\
+        --files T2.nii.gz
 
 EOF
 }
@@ -28,6 +63,7 @@ EOF
 ############################################
 # Validate orientation string
 ############################################
+
 is_valid_orientation() {
 
     local orient="$1"
@@ -48,6 +84,7 @@ is_valid_orientation() {
 ############################################
 # Predict orientation helper
 ############################################
+
 predict_orientation() {
 
     local img="$1"
@@ -60,47 +97,81 @@ predict_orientation() {
 }
 
 ############################################
-# Main
+# Parse arguments
 ############################################
 
-if [[ $# -lt 4 || $# -gt 5 ]]; then
-    usage
+mask=""
+orientation_input=""
+output_dir=""
+files_csv=""
+
+while [[ $# -gt 0 ]]; do
+
+    case "$1" in
+
+        --mask)
+            mask="$2"
+            shift 2
+            ;;
+
+        --orientation)
+            orientation_input="$2"
+            shift 2
+            ;;
+
+        --output_dir)
+            output_dir="$2"
+            shift 2
+            ;;
+
+        --files)
+            files_csv="$2"
+            shift 2
+            ;;
+
+        -h|--help)
+            usage
+            exit 0
+            ;;
+
+        *)
+            echo "ERROR: Unknown argument:"
+            echo "    $1"
+            echo
+            usage
+            exit 1
+            ;;
+
+    esac
+
+done
+
+############################################
+# Validate required args
+############################################
+
+if [[ -z "${mask}" ]]; then
+    echo "ERROR: --mask is required"
     exit 1
 fi
 
-input_dir="$1"
-output_dir="$2"
-output_orientation_input="$3"
-mask="$4"
-T2="${5:-}"
+if [[ -z "${orientation_input}" ]]; then
+    echo "ERROR: --orientation is required"
+    exit 1
+fi
 
-############################################
-# Check input directory
-############################################
-
-if [[ ! -d "${input_dir}" ]]; then
-    echo "ERROR: Input directory does not exist:"
-    echo "    ${input_dir}"
+if [[ -z "${output_dir}" ]]; then
+    echo "ERROR: --output_dir is required"
     exit 1
 fi
 
 ############################################
-# Check mask
+# Validate files
 ############################################
 
 if [[ ! -f "${mask}" ]]; then
-    echo "ERROR: Mask file does not exist:"
+    echo "ERROR: Mask does not exist:"
     echo "    ${mask}"
-    exit 1
-fi
-
-############################################
-# Check optional T2
-############################################
-
-if [[ -n "${T2}" && ! -f "${T2}" ]]; then
-    echo "ERROR: T2 file does not exist:"
-    echo "    ${T2}"
     exit 1
 fi
 
@@ -123,7 +194,7 @@ fi
 input_orientation=$(predict_orientation "${mask}")
 
 if [[ -z "${input_orientation}" ]]; then
-    echo "ERROR: Failed to determine orientation of input mask:"
+    echo "ERROR: Failed to determine orientation of mask:"
     echo "    ${mask}"
     exit 1
 fi
@@ -135,17 +206,17 @@ echo "Automatic input orientation found: ${input_orientation}"
 # Determine output orientation
 ############################################
 
-if [[ -f "${output_orientation_input}" ]]; then
+if [[ -f "${orientation_input}" ]]; then
 
     echo
-    echo "Output orientation input appears to be an image/mask:"
-    echo "    ${output_orientation_input}"
+    echo "Orientation reference image detected:"
+    echo "    ${orientation_input}"
 
-    output_orientation=$(predict_orientation "${output_orientation_input}")
+    output_orientation=$(predict_orientation "${orientation_input}")
 
     if [[ -z "${output_orientation}" ]]; then
-        echo "ERROR: Failed to determine orientation from output reference mask:"
-        echo "    ${output_orientation_input}"
+        echo "ERROR: Failed to determine orientation from reference image:"
+        echo "    ${orientation_input}"
         exit 1
     fi
 
@@ -153,15 +224,11 @@ if [[ -f "${output_orientation_input}" ]]; then
 
 else
 
-    output_orientation="${output_orientation_input}"
+    output_orientation="${orientation_input}"
 
     if ! is_valid_orientation "${output_orientation}"; then
-        echo "ERROR: Invalid output orientation:"
+        echo "ERROR: Invalid orientation:"
         echo "    ${output_orientation}"
-        echo
-        echo "Expected either:"
-        echo "    - valid 3-letter orientation (e.g. ALS, RPI, LPS)"
-        echo "    - OR a valid image/mask file"
         exit 1
     fi
 
@@ -171,52 +238,59 @@ else
 fi
 
 ############################################
-# MATLAB executable path
+# Validate transform executable
 ############################################
 
-transform_exec="/home/apps/matlab_execs_for_SAMBA/img_transform_executable/run_img_transform_exec.sh"
-mcr="/home/apps/MATLAB2015b_runtime/v90"
-
 if [[ ! -x "${transform_exec}" ]]; then
-    echo "ERROR: Transform executable not found or not executable:"
+    echo "ERROR: Transform executable missing or not executable:"
     echo "    ${transform_exec}"
     exit 1
 fi
 
 ############################################
-# Reorient mask
+# Build file list
+############################################
+
+declare -a files_to_process
+
+files_to_process+=("${mask}")
+
+if [[ -n "${files_csv}" ]]; then
+
+    IFS=',' read -ra additional_files <<< "${files_csv}"
+
+    for f in "${additional_files[@]}"; do
+
+        f=$(echo "${f}" | xargs)
+
+        [[ -z "${f}" ]] && continue
+
+        if [[ ! -f "${f}" ]]; then
+            echo "ERROR: Additional file does not exist:"
+            echo "    ${f}"
+            exit 1
+        fi
+
+        files_to_process+=("${f}")
+
+    done
+
+fi
+
+############################################
+# Reorient files
 ############################################
 
 echo
-echo "Reorienting:"
-echo "    ${mask}"
-echo "FROM:"
-echo "    ${input_orientation}"
-echo "TO:"
-echo "    ${output_orientation}"
+echo "===================================================="
+echo "Beginning reorientation"
+echo "===================================================="
 
-"${transform_exec}" \
-    "${mcr}" \
-    "${mask}" \
-    "${input_orientation}" \
-    "${output_orientation}" \
-    "${output_dir}/"
-
-mask_output="${output_dir}/$(basename "${mask}")"
-
-echo
-echo "Mask output written to:"
-echo "    ${mask_output}"
-
-############################################
-# Reorient optional T2
-############################################
-
-if [[ -n "${T2}" ]]; then
+for infile in "${files_to_process[@]}"; do
 
     echo
     echo "Reorienting:"
-    echo "    ${T2}"
+    echo "    ${infile}"
     echo "FROM:"
     echo "    ${input_orientation}"
     echo "TO:"
@@ -224,19 +298,21 @@ if [[ -n "${T2}" ]]; then
 
     "${transform_exec}" \
         "${mcr}" \
-        "${T2}" \
+        "${infile}" \
         "${input_orientation}" \
         "${output_orientation}" \
         "${output_dir}/"
 
-    T2_output="${output_dir}/$(basename "${T2}")"
+    outfile="${output_dir}/$(basename "${infile}")"
 
     echo
-    echo "T2 output written to:"
-    echo "    ${T2_output}"
+    echo "Output written to:"
+    echo "    ${outfile}"
 
-fi
+done
 
 echo
-echo "Done."
+echo "===================================================="
+echo "Done"
+echo "===================================================="
 echo
