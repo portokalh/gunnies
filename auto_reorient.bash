@@ -22,7 +22,7 @@ Usage:
         --mask <mask.nii.gz> \\
         --orientation <ALS | reference_mask.nii.gz> \\
         --output_dir <output_dir> \\
-        --files <file1,file2,file3>
+        [--files <file1,file2,file3>]
 
 Required:
     --mask
@@ -41,6 +41,9 @@ Optional:
         Comma-delimited list of additional files to reorient
         The mask itself is ALWAYS reoriented automatically
 
+    -h, --help
+        Show this help message
+
 Examples:
 
     Explicit orientation:
@@ -58,6 +61,21 @@ Examples:
         --files T2.nii.gz
 
 EOF
+}
+
+############################################
+# Error helper
+############################################
+
+die() {
+
+    echo
+    echo "ERROR: $1"
+    echo
+
+    usage
+
+    exit 1
 }
 
 ############################################
@@ -105,41 +123,56 @@ orientation_input=""
 output_dir=""
 files_csv=""
 
+if [[ $# -eq 0 ]]; then
+    usage
+    exit 1
+fi
+
 while [[ $# -gt 0 ]]; do
 
     case "$1" in
 
         --mask)
+
+            [[ $# -ge 2 ]] || die "--mask requires an argument"
+
             mask="$2"
             shift 2
             ;;
 
         --orientation)
+
+            [[ $# -ge 2 ]] || die "--orientation requires an argument"
+
             orientation_input="$2"
             shift 2
             ;;
 
         --output_dir)
+
+            [[ $# -ge 2 ]] || die "--output_dir requires an argument"
+
             output_dir="$2"
             shift 2
             ;;
 
         --files)
+
+            [[ $# -ge 2 ]] || die "--files requires an argument"
+
             files_csv="$2"
             shift 2
             ;;
 
         -h|--help)
+
             usage
             exit 0
             ;;
 
         *)
-            echo "ERROR: Unknown argument:"
-            echo "    $1"
-            echo
-            usage
-            exit 1
+
+            die "Unknown argument: $1"
             ;;
 
     esac
@@ -150,30 +183,17 @@ done
 # Validate required args
 ############################################
 
-if [[ -z "${mask}" ]]; then
-    echo "ERROR: --mask is required"
-    exit 1
-fi
+[[ -n "${mask}" ]] || die "--mask is required"
 
-if [[ -z "${orientation_input}" ]]; then
-    echo "ERROR: --orientation is required"
-    exit 1
-fi
+[[ -n "${orientation_input}" ]] || die "--orientation is required"
 
-if [[ -z "${output_dir}" ]]; then
-    echo "ERROR: --output_dir is required"
-    exit 1
-fi
+[[ -n "${output_dir}" ]] || die "--output_dir is required"
 
 ############################################
-# Validate files
+# Validate mask
 ############################################
 
-if [[ ! -f "${mask}" ]]; then
-    echo "ERROR: Mask does not exist:"
-    echo "    ${mask}"
-    exit 1
-fi
+[[ -f "${mask}" ]] || die "Mask does not exist: ${mask}"
 
 ############################################
 # Create output directory
@@ -181,11 +201,7 @@ fi
 
 mkdir -p "${output_dir}"
 
-if [[ ! -d "${output_dir}" ]]; then
-    echo "ERROR: Failed to create output directory:"
-    echo "    ${output_dir}"
-    exit 1
-fi
+[[ -d "${output_dir}" ]] || die "Failed to create output directory: ${output_dir}"
 
 ############################################
 # Determine input orientation
@@ -193,11 +209,7 @@ fi
 
 input_orientation=$(predict_orientation "${mask}")
 
-if [[ -z "${input_orientation}" ]]; then
-    echo "ERROR: Failed to determine orientation of mask:"
-    echo "    ${mask}"
-    exit 1
-fi
+[[ -n "${input_orientation}" ]] || die "Failed to determine orientation of mask: ${mask}"
 
 echo
 echo "Automatic input orientation found: ${input_orientation}"
@@ -214,11 +226,8 @@ if [[ -f "${orientation_input}" ]]; then
 
     output_orientation=$(predict_orientation "${orientation_input}")
 
-    if [[ -z "${output_orientation}" ]]; then
-        echo "ERROR: Failed to determine orientation from reference image:"
-        echo "    ${orientation_input}"
-        exit 1
-    fi
+    [[ -n "${output_orientation}" ]] || \
+        die "Failed to determine orientation from reference image: ${orientation_input}"
 
     echo "Automatic output orientation found: ${output_orientation}"
 
@@ -226,11 +235,8 @@ else
 
     output_orientation="${orientation_input}"
 
-    if ! is_valid_orientation "${output_orientation}"; then
-        echo "ERROR: Invalid orientation:"
-        echo "    ${output_orientation}"
-        exit 1
-    fi
+    is_valid_orientation "${output_orientation}" || \
+        die "Invalid orientation: ${output_orientation}"
 
     echo
     echo "Using explicit output orientation: ${output_orientation}"
@@ -241,11 +247,8 @@ fi
 # Validate transform executable
 ############################################
 
-if [[ ! -x "${transform_exec}" ]]; then
-    echo "ERROR: Transform executable missing or not executable:"
-    echo "    ${transform_exec}"
-    exit 1
-fi
+[[ -x "${transform_exec}" ]] || \
+    die "Transform executable missing or not executable: ${transform_exec}"
 
 ############################################
 # Build file list
@@ -265,11 +268,7 @@ if [[ -n "${files_csv}" ]]; then
 
         [[ -z "${f}" ]] && continue
 
-        if [[ ! -f "${f}" ]]; then
-            echo "ERROR: Additional file does not exist:"
-            echo "    ${f}"
-            exit 1
-        fi
+        [[ -f "${f}" ]] || die "Additional file does not exist: ${f}"
 
         files_to_process+=("${f}")
 
