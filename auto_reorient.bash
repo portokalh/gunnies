@@ -187,9 +187,9 @@ prepare_temp_binary_mask() {
 
     local input_img="$1"
 
-    echo
-    echo "Generating temporary binary mask for:"
-    echo "    ${input_img}"
+    >&2 echo
+    >&2 echo "Generating temporary binary mask for:"
+    >&2 echo "    ${input_img}"
 
     local tmpmask
     tmpmask=$(mktemp /tmp/orient_mask_XXXXXX.nii.gz)
@@ -207,9 +207,9 @@ prepare_temp_binary_mask() {
 
     read -r minval maxval <<< "$(fslstats "${tmpmask}" -R)"
 
-    echo "Temporary mask value range:"
-    echo "    min = ${minval}"
-    echo "    max = ${maxval}"
+    >&2 echo "Temporary mask value range:"
+    >&2 echo "    min = ${minval}"
+    >&2 echo "    max = ${maxval}"
 
     ########################################
     # Reject all-zero masks
@@ -259,8 +259,8 @@ prepare_temp_binary_mask() {
 
     fi
 
-    echo "Temporary orientation mask:"
-    echo "    ${tmpmask}"
+    >&2 echo "Temporary orientation mask:"
+    >&2 echo "    ${tmpmask}"
 
     echo "${tmpmask}"
 }
