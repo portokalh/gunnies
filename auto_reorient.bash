@@ -119,17 +119,44 @@ trap cleanup EXIT
 
 is_valid_orientation() {
 
-    local orient="$1"
+    local orient
+    orient=$(echo "$1" | tr '[:lower:]' '[:upper:]')
 
     [[ ${#orient} -eq 3 ]] || return 1
 
-    local c1="${orient:0:1}"
-    local c2="${orient:1:1}"
-    local c3="${orient:2:1}"
+    local has_rl=0
+    local has_ap=0
+    local has_si=0
 
-    [[ "$c1" =~ [RL] ]] || return 1
-    [[ "$c2" =~ [AP] ]] || return 1
-    [[ "$c3" =~ [SI] ]] || return 1
+    for (( i=0; i<3; i++ )); do
+
+        char="${orient:$i:1}"
+
+        case "${char}" in
+
+            R|L)
+                ((has_rl++))
+                ;;
+
+            A|P)
+                ((has_ap++))
+                ;;
+
+            S|I)
+                ((has_si++))
+                ;;
+
+            *)
+                return 1
+                ;;
+
+        esac
+
+    done
+
+    [[ ${has_rl} -eq 1 ]] || return 1
+    [[ ${has_ap} -eq 1 ]] || return 1
+    [[ ${has_si} -eq 1 ]] || return 1
 
     return 0
 }
