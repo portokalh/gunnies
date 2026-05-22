@@ -18,47 +18,65 @@ usage() {
 cat <<EOF
 
 Usage:
-    $(basename "$0") \\
-        --mask <mask.nii.gz> \\
-        --orientation <ALS | reference_mask.nii.gz> \\
-        --output_dir <output_dir> \\
-        [--files <file1,file2,file3>]
+    Orientation detection only:
+        $(basename "$0") -m brain_mask.nii.gz
+
+    Reorientation:
+        $(basename "$0") \\
+            -m brain_mask.nii.gz \\
+            -r ALS \\
+            -o output_dir \\
+            [-f file1,file2,file3]
 
 Required:
-    --mask
-        Input mask used to determine current orientation
+    -m
+        Input mask/image used to determine current orientation
 
-    --orientation
-        Either:
+Optional:
+    -r
+        Reference orientation
+
+        Can be either:
             - valid 3-letter orientation (ALS, RPI, LPS, etc)
             - OR reference image/mask whose orientation will be inferred
 
-    --output_dir
+    -o
         Output directory
 
-Optional:
-    --files
+    -f
         Comma-delimited list of additional files to reorient
-        The mask itself is ALWAYS reoriented automatically
 
-    -h, --help
+        The mask/image itself is ALWAYS reoriented automatically.
+
+    -h
         Show this help message
+
+Behavior:
+    If ONLY -m is provided:
+        The script reports the detected orientation and exits.
+
+    If the input mask/image is not binary:
+        A temporary binary mask is automatically generated
+        using all nonzero voxels for orientation detection.
 
 Examples:
 
+    Orientation detection only:
+        $(basename "$0") -m brain_mask.nii.gz
+
     Explicit orientation:
-    $(basename "$0") \\
-        --mask brain_mask.nii.gz \\
-        --orientation ALS \\
-        --output_dir reoriented \\
-        --files T2.nii.gz,DWI.nii.gz
+        $(basename "$0") \\
+            -m brain_mask.nii.gz \\
+            -r ALS \\
+            -o reoriented \\
+            -f T2.nii.gz,DWI.nii.gz
 
     Reference image orientation:
-    $(basename "$0") \\
-        --mask brain_mask.nii.gz \\
-        --orientation reference_mask.nii.gz \\
-        --output_dir reoriented \\
-        --files T2.nii.gz
+        $(basename "$0") \\
+            -m brain_mask.nii.gz \\
+            -r reference_mask.nii.gz \\
+            -o reoriented \\
+            -f T2.nii.gz
 
 EOF
 }
@@ -77,6 +95,23 @@ die() {
 
     exit 1
 }
+
+############################################
+# Cleanup
+############################################
+
+cleanup() {
+
+    if [[ -n "${tmp_orientation_mask:-}" ]]; then
+
+        if [[ -f "${tmp_orientation_mask}" ]]; then
+            rm -f "${tmp_orientation_mask}"
+        fi
+
+    fi
+}
+
+trap cleanup EXIT
 
 ############################################
 # Validate orientation string
@@ -115,11 +150,69 @@ predict_orientation() {
 }
 
 ############################################
+# Determine whether image is binary
+############################################
+
+is_binary_mask() {
+
+    local img="$1"
+
+    local minval
+    local maxval
+
+    read -r minval maxval <<< "$(fslstats "${img}" -R)"
+
+    if [[ "${minval}" == "0" && "${maxval}" == "1" ]]; then
+        return 0
+    fi
+
+    if [[ "${minval}" == "1" && "${maxval}" == "1" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+############################################
+# Prepare orientation mask
+############################################
+
+prepare_orientation_mask() {
+
+    local input_img="$1"
+
+    if is_binary_mask "${input_img}"; then
+
+        echo
+        echo "Input appears to already be a binary mask."
+
+        orientation_mask="${input_img}"
+
+    else
+
+        echo
+        echo "Input does NOT appear to be binary."
+        echo "Generating temporary nonzero mask for orientation detection."
+
+        tmp_orientation_mask=$(mktemp /tmp/orient_mask_XXXXXX.nii.gz)
+
+        fslmaths "${input_img}" -bin "${tmp_orientation_mask}"
+
+        orientation_mask="${tmp_orientation_mask}"
+
+        echo
+        echo "Temporary orientation mask:"
+        echo "    ${orientation_mask}"
+
+    fi
+}
+
+############################################
 # Parse arguments
 ############################################
 
 mask=""
-orientation_input=""
+reference_orientation=""
 output_dir=""
 files_csv=""
 
@@ -128,51 +221,37 @@ if [[ $# -eq 0 ]]; then
     exit 1
 fi
 
-while [[ $# -gt 0 ]]; do
+while getopts ":m:r:o:f:h" opt; do
 
-    case "$1" in
+    case ${opt} in
 
-        --mask)
-
-            [[ $# -ge 2 ]] || die "--mask requires an argument"
-
-            mask="$2"
-            shift 2
+        m)
+            mask="${OPTARG}"
             ;;
 
-        --orientation)
-
-            [[ $# -ge 2 ]] || die "--orientation requires an argument"
-
-            orientation_input="$2"
-            shift 2
+        r)
+            reference_orientation="${OPTARG}"
             ;;
 
-        --output_dir)
-
-            [[ $# -ge 2 ]] || die "--output_dir requires an argument"
-
-            output_dir="$2"
-            shift 2
+        o)
+            output_dir="${OPTARG}"
             ;;
 
-        --files)
-
-            [[ $# -ge 2 ]] || die "--files requires an argument"
-
-            files_csv="$2"
-            shift 2
+        f)
+            files_csv="${OPTARG}"
             ;;
 
-        -h|--help)
-
+        h)
             usage
             exit 0
             ;;
 
-        *)
+        :)
+            die "Option -${OPTARG} requires an argument"
+            ;;
 
-            die "Unknown argument: $1"
+        \?)
+            die "Invalid option: -${OPTARG}"
             ;;
 
     esac
@@ -180,20 +259,62 @@ while [[ $# -gt 0 ]]; do
 done
 
 ############################################
-# Validate required args
-############################################
-
-[[ -n "${mask}" ]] || die "--mask is required"
-
-[[ -n "${orientation_input}" ]] || die "--orientation is required"
-
-[[ -n "${output_dir}" ]] || die "--output_dir is required"
-
-############################################
 # Validate mask
 ############################################
 
-[[ -f "${mask}" ]] || die "Mask does not exist: ${mask}"
+[[ -n "${mask}" ]] || die "-m is required"
+
+[[ -f "${mask}" ]] || die "Mask/image does not exist: ${mask}"
+
+############################################
+# Validate dependencies
+############################################
+
+command -v fslstats >/dev/null 2>&1 || \
+    die "fslstats not found in PATH"
+
+command -v fslmaths >/dev/null 2>&1 || \
+    die "fslmaths not found in PATH"
+
+############################################
+# Prepare orientation mask
+############################################
+
+prepare_orientation_mask "${mask}"
+
+############################################
+# Determine input orientation
+############################################
+
+input_orientation=$(predict_orientation "${orientation_mask}")
+
+[[ -n "${input_orientation}" ]] || \
+    die "Failed to determine orientation of input image"
+
+echo
+echo "Automatic input orientation found: ${input_orientation}"
+
+############################################
+# Orientation detection only mode
+############################################
+
+if [[ -z "${reference_orientation}" ]]; then
+
+    echo
+    echo "No reference orientation provided."
+    echo "Orientation detection complete."
+    echo
+
+    exit 0
+
+fi
+
+############################################
+# Validate output dir requirement
+############################################
+
+[[ -n "${output_dir}" ]] || \
+    die "-o output directory is required when using -r"
 
 ############################################
 # Create output directory
@@ -201,39 +322,29 @@ done
 
 mkdir -p "${output_dir}"
 
-[[ -d "${output_dir}" ]] || die "Failed to create output directory: ${output_dir}"
-
-############################################
-# Determine input orientation
-############################################
-
-input_orientation=$(predict_orientation "${mask}")
-
-[[ -n "${input_orientation}" ]] || die "Failed to determine orientation of mask: ${mask}"
-
-echo
-echo "Automatic input orientation found: ${input_orientation}"
+[[ -d "${output_dir}" ]] || \
+    die "Failed to create output directory: ${output_dir}"
 
 ############################################
 # Determine output orientation
 ############################################
 
-if [[ -f "${orientation_input}" ]]; then
+if [[ -f "${reference_orientation}" ]]; then
 
     echo
-    echo "Orientation reference image detected:"
-    echo "    ${orientation_input}"
+    echo "Reference orientation image detected:"
+    echo "    ${reference_orientation}"
 
-    output_orientation=$(predict_orientation "${orientation_input}")
+    output_orientation=$(predict_orientation "${reference_orientation}")
 
     [[ -n "${output_orientation}" ]] || \
-        die "Failed to determine orientation from reference image: ${orientation_input}"
+        die "Failed to determine orientation from reference image: ${reference_orientation}"
 
     echo "Automatic output orientation found: ${output_orientation}"
 
 else
 
-    output_orientation="${orientation_input}"
+    output_orientation="${reference_orientation}"
 
     is_valid_orientation "${output_orientation}" || \
         die "Invalid orientation: ${output_orientation}"
@@ -268,7 +379,8 @@ if [[ -n "${files_csv}" ]]; then
 
         [[ -z "${f}" ]] && continue
 
-        [[ -f "${f}" ]] || die "Additional file does not exist: ${f}"
+        [[ -f "${f}" ]] || \
+            die "Additional file does not exist: ${f}"
 
         files_to_process+=("${f}")
 
