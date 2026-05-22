@@ -30,7 +30,7 @@ Usage:
 
 Required:
     -m
-        Input mask/image used to determine current orientation
+        Input image used to determine current orientation
 
 Optional:
     -r
@@ -38,7 +38,7 @@ Optional:
 
         Can be either:
             - valid 3-letter orientation (ALS, RPI, LPS, etc)
-            - OR reference image/mask whose orientation will be inferred
+            - OR reference image whose orientation will be inferred
 
     -o
         Output directory
@@ -46,7 +46,7 @@ Optional:
     -f
         Comma-delimited list of additional files to reorient
 
-        The mask/image itself is ALWAYS reoriented automatically.
+        The input image itself is ALWAYS reoriented automatically.
 
     -h
         Show this help message
@@ -55,9 +55,12 @@ Behavior:
     If ONLY -m is provided:
         The script reports the detected orientation and exits.
 
-    If the input mask/image is not binary:
-        A temporary binary mask is automatically generated
-        using all nonzero voxels for orientation detection.
+    Images are automatically binarized using:
+        fslmaths image -bin
+
+    Binarized masks are checked to ensure they are not:
+        - entirely zero
+        - entirely one
 
 Examples:
 
@@ -100,15 +103,15 @@ die() {
 # Cleanup
 ############################################
 
+tmp_files=()
+
 cleanup() {
 
-    if [[ -n "${tmp_orientation_mask:-}" ]]; then
+    for f in "${tmp_files[@]:-}"; do
 
-        if [[ -f "${tmp_orientation_mask}" ]]; then
-            rm -f "${tmp_orientation_mask}"
-        fi
+        [[ -f "${f}" ]] && rm -f "${f}"
 
-    fi
+    done
 }
 
 trap cleanup EXIT
@@ -130,7 +133,7 @@ is_valid_orientation() {
 
     for (( i=0; i<3; i++ )); do
 
-        char="${orient:$i:1}"
+        local char="${orient:$i:1}"
 
         case "${char}" in
 
@@ -177,61 +180,89 @@ predict_orientation() {
 }
 
 ############################################
-# Determine whether image is binary
+# Create temporary binary mask
 ############################################
 
-is_binary_mask() {
+prepare_temp_binary_mask() {
 
-    local img="$1"
+    local input_img="$1"
+
+    echo
+    echo "Generating temporary binary mask for:"
+    echo "    ${input_img}"
+
+    local tmpmask
+    tmpmask=$(mktemp /tmp/orient_mask_XXXXXX.nii.gz)
+
+    tmp_files+=("${tmpmask}")
+
+    fslmaths "${input_img}" -bin "${tmpmask}"
+
+    ########################################
+    # Validate binary mask
+    ########################################
 
     local minval
     local maxval
 
-    read -r minval maxval <<< "$(fslstats "${img}" -R)"
+    read -r minval maxval <<< "$(fslstats "${tmpmask}" -R)"
 
-    if [[ "${minval}" == "0" && "${maxval}" == "1" ]]; then
-        return 0
-    fi
+    echo "Temporary mask value range:"
+    echo "    min = ${minval}"
+    echo "    max = ${maxval}"
 
-    if [[ "${minval}" == "1" && "${maxval}" == "1" ]]; then
-        return 0
-    fi
+    ########################################
+    # Reject all-zero masks
+    ########################################
 
-    return 1
-}
+    awk -v min="${minval}" -v max="${maxval}" '
+    BEGIN {
 
-############################################
-# Prepare orientation mask
-############################################
+        tol = 1e-6
 
-prepare_orientation_mask() {
+        if (min > -tol && min < tol &&
+            max > -tol && max < tol)
+            exit 1
 
-    local input_img="$1"
+        exit 0
+    }'
 
-    if is_binary_mask "${input_img}"; then
+    if [[ $? -ne 0 ]]; then
 
-        echo
-        echo "Input appears to already be a binary mask."
+        rm -f "${tmpmask}"
 
-        orientation_mask="${input_img}"
-
-    else
-
-        echo
-        echo "Input does NOT appear to be binary."
-        echo "Generating temporary nonzero mask for orientation detection."
-
-        tmp_orientation_mask=$(mktemp /tmp/orient_mask_XXXXXX.nii.gz)
-
-        fslmaths "${input_img}" -bin "${tmp_orientation_mask}"
-
-        orientation_mask="${tmp_orientation_mask}"
-
-        echo
-        echo "Temporary orientation mask:"
-        echo "    ${orientation_mask}"
+        die "Binarized image is entirely zero: ${input_img}"
 
     fi
+
+    ########################################
+    # Reject all-one masks
+    ########################################
+
+    awk -v min="${minval}" -v max="${maxval}" '
+    BEGIN {
+
+        tol = 1e-6
+
+        if (min > 1-tol && min < 1+tol &&
+            max > 1-tol && max < 1+tol)
+            exit 1
+
+        exit 0
+    }'
+
+    if [[ $? -ne 0 ]]; then
+
+        rm -f "${tmpmask}"
+
+        die "Binarized image is entirely one: ${input_img}"
+
+    fi
+
+    echo "Temporary orientation mask:"
+    echo "    ${tmpmask}"
+
+    echo "${tmpmask}"
 }
 
 ############################################
@@ -286,37 +317,34 @@ while getopts ":m:r:o:f:h" opt; do
 done
 
 ############################################
-# Validate mask
+# Validate required args
 ############################################
 
 [[ -n "${mask}" ]] || die "-m is required"
 
-[[ -f "${mask}" ]] || die "Mask/image does not exist: ${mask}"
+[[ -f "${mask}" ]] || \
+    die "Input image does not exist: ${mask}"
 
 ############################################
 # Validate dependencies
 ############################################
 
-command -v fslstats >/dev/null 2>&1 || \
-    die "fslstats not found in PATH"
-
 command -v fslmaths >/dev/null 2>&1 || \
     die "fslmaths not found in PATH"
 
-############################################
-# Prepare orientation mask
-############################################
-
-prepare_orientation_mask "${mask}"
+command -v fslstats >/dev/null 2>&1 || \
+    die "fslstats not found in PATH"
 
 ############################################
 # Determine input orientation
 ############################################
 
-input_orientation=$(predict_orientation "${orientation_mask}")
+input_mask=$(prepare_temp_binary_mask "${mask}")
+
+input_orientation=$(predict_orientation "${input_mask}")
 
 [[ -n "${input_orientation}" ]] || \
-    die "Failed to determine orientation of input image"
+    die "Failed to determine input orientation"
 
 echo
 echo "Automatic input orientation found: ${input_orientation}"
@@ -337,22 +365,6 @@ if [[ -z "${reference_orientation}" ]]; then
 fi
 
 ############################################
-# Validate output dir requirement
-############################################
-
-[[ -n "${output_dir}" ]] || \
-    die "-o output directory is required when using -r"
-
-############################################
-# Create output directory
-############################################
-
-mkdir -p "${output_dir}"
-
-[[ -d "${output_dir}" ]] || \
-    die "Failed to create output directory: ${output_dir}"
-
-############################################
 # Determine output orientation
 ############################################
 
@@ -362,16 +374,19 @@ if [[ -f "${reference_orientation}" ]]; then
     echo "Reference orientation image detected:"
     echo "    ${reference_orientation}"
 
-    output_orientation=$(predict_orientation "${reference_orientation}")
+    ref_mask=$(prepare_temp_binary_mask "${reference_orientation}")
+
+    output_orientation=$(predict_orientation "${ref_mask}")
 
     [[ -n "${output_orientation}" ]] || \
-        die "Failed to determine orientation from reference image: ${reference_orientation}"
+        die "Failed to determine orientation from reference image"
 
+    echo
     echo "Automatic output orientation found: ${output_orientation}"
 
 else
 
-    output_orientation="${reference_orientation}"
+    output_orientation=$(echo "${reference_orientation}" | tr '[:lower:]' '[:upper:]')
 
     is_valid_orientation "${output_orientation}" || \
         die "Invalid orientation: ${output_orientation}"
@@ -380,6 +395,18 @@ else
     echo "Using explicit output orientation: ${output_orientation}"
 
 fi
+
+############################################
+# Validate output dir requirement
+############################################
+
+[[ -n "${output_dir}" ]] || \
+    die "-o output directory is required when using -r"
+
+mkdir -p "${output_dir}"
+
+[[ -d "${output_dir}" ]] || \
+    die "Failed to create output directory: ${output_dir}"
 
 ############################################
 # Validate transform executable
@@ -429,8 +456,10 @@ for infile in "${files_to_process[@]}"; do
     echo
     echo "Reorienting:"
     echo "    ${infile}"
+
     echo "FROM:"
     echo "    ${input_orientation}"
+
     echo "TO:"
     echo "    ${output_orientation}"
 
