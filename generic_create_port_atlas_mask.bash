@@ -43,6 +43,8 @@ if [[ $rigid_only ]];then
 else
         cmd="antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t affine[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix}";
 fi
+echo "Registration command:";
+echo "$cmd";
 $cmd;
 echo "Step 3"
 echo "Step 4"
