@@ -39,10 +39,11 @@ echo "Step 1";
 ImageMath 3 ${norm_mask} Normalize ${bad_mask};
 echo "Step 2"
 if [[ $rigid_only ]];then
-	antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t rigid[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix};
+	cmd="antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t rigid[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix}";
 else
-        antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t affine[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix};
+        cmd="antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t affine[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix}";
 fi
+$cmd;
 echo "Step 3"
 echo "Step 4"
 antsApplyTransforms -v 1 --float -d 3 -i ${good_mask} -o ${atlas_mask} -t [${prefix}0GenericAffine.mat, 1] -r ${norm_mask} -n NearestNeighbor;
