@@ -38,7 +38,7 @@ echo "Let\'s get this party started!";
 echo "Step 1";
 ImageMath 3 ${norm_mask} Normalize ${bad_mask};
 echo "Step 2"
-if [[ $rigid_only ]];then
+if [[ "x${rigid_only}x" == "x1x" ]];then
 	cmd="antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t rigid[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix}";
 else
         cmd="antsRegistration -v 1 -d 3 -r [${good_mask},${norm_mask},1]  -m MeanSquares[${good_mask},${norm_mask},1,32,random,0.3] -t affine[0.1] -c [3000x3000x0x0,1.e-8,20]  -s 4x2x1x0.5vox -f 6x4x2x1 -u 1 -z 1 -o ${prefix}";
