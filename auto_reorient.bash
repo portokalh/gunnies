@@ -37,6 +37,20 @@ Options:
     -h
         Show help
 
+Behavior:
+    If -m is an image and no -r is provided:
+        The image is binarized, its orientation is detected,
+        and the orientation is reported.
+
+    If -m is a 3-letter orientation:
+        Files supplied with -f are assumed to start in that orientation.
+
+    Any image used for orientation detection is first binarized
+    using all nonzero voxels.
+
+    The temporary binary mask must contain both 0 and 1.
+    All-zero or all-one masks are rejected.
+
 EOF
 }
 
@@ -48,6 +62,10 @@ die() {
     exit 1
 }
 
+############################################
+# Cleanup
+############################################
+
 tmp_files=()
 
 cleanup() {
@@ -58,6 +76,10 @@ cleanup() {
 
 trap cleanup EXIT
 
+############################################
+# Validate SPIRAL orientation
+############################################
+
 is_valid_orientation() {
     local orient
     orient=$(echo "$1" | tr '[:lower:]' '[:upper:]')
@@ -67,20 +89,35 @@ is_valid_orientation() {
     local has_rl=0
     local has_ap=0
     local has_si=0
+    local char
 
     for (( i=0; i<3; i++ )); do
-        local char="${orient:$i:1}"
+        char="${orient:$i:1}"
 
         case "$char" in
-            R|L) ((has_rl++)) ;;
-            A|P) ((has_ap++)) ;;
-            S|I) ((has_si++)) ;;
-            *) return 1 ;;
+            R|L)
+                ((has_rl+=1))
+                ;;
+            A|P)
+                ((has_ap+=1))
+                ;;
+            S|I)
+                ((has_si+=1))
+                ;;
+            *)
+                return 1
+                ;;
         esac
     done
 
-    [[ $has_rl -eq 1 && $has_ap -eq 1 && $has_si -eq 1 ]]
+    [[ $has_rl -eq 1 &&
+       $has_ap -eq 1 &&
+       $has_si -eq 1 ]]
 }
+
+############################################
+# Predict orientation
+############################################
 
 predict_orientation() {
     local img="$1"
@@ -92,6 +129,10 @@ predict_orientation() {
         | tr -d '[:blank:]'
 }
 
+############################################
+# Generate temporary binary mask
+############################################
+
 prepare_temp_binary_mask() {
     local input_img="$1"
 
@@ -101,39 +142,31 @@ prepare_temp_binary_mask() {
 
     local tmpmask
     tmpmask=$(mktemp /tmp/orient_mask_XXXXXX.nii.gz)
+
     tmp_files+=("$tmpmask")
 
     fslmaths "$input_img" -bin "$tmpmask"
 
     local minval
     local maxval
+
     read -r minval maxval <<< "$(fslstats "$tmpmask" -R)"
 
     >&2 echo "Temporary mask value range:"
     >&2 echo "    min = ${minval}"
     >&2 echo "    max = ${maxval}"
 
-    if awk -v min="$minval" -v max="$maxval" '
-        BEGIN {
-            tol = 1e-6
-            exit !(
-                min > -tol && min < tol &&
-                max > -tol && max < tol
-            )
-        }'
-    then
+    if [[ "$minval" == "0.000000" &&
+          "$maxval" == "0.000000" ]]; then
+
+        rm -f "$tmpmask"
         die "Binarized image is entirely zero: ${input_img}"
     fi
 
-    if awk -v min="$minval" -v max="$maxval" '
-        BEGIN {
-            tol = 1e-6
-            exit !(
-                min > 1-tol && min < 1+tol &&
-                max > 1-tol && max < 1+tol
-            )
-        }'
-    then
+    if [[ "$minval" == "1.000000" &&
+          "$maxval" == "1.000000" ]]; then
+
+        rm -f "$tmpmask"
         die "Binarized image is entirely one: ${input_img}"
     fi
 
@@ -143,22 +176,34 @@ prepare_temp_binary_mask() {
     echo "$tmpmask"
 }
 
+############################################
+# Parse arguments
+############################################
+
 mask_or_orientation=""
 reference_orientation=""
 output_dir=""
 files_csv=""
 
-[[ $# -gt 0 ]] || {
+if [[ $# -eq 0 ]]; then
     usage
     exit 1
-}
+fi
 
 while getopts ":m:r:o:f:h" opt; do
     case "$opt" in
-        m) mask_or_orientation="$OPTARG" ;;
-        r) reference_orientation="$OPTARG" ;;
-        o) output_dir="$OPTARG" ;;
-        f) files_csv="$OPTARG" ;;
+        m)
+            mask_or_orientation="$OPTARG"
+            ;;
+        r)
+            reference_orientation="$OPTARG"
+            ;;
+        o)
+            output_dir="$OPTARG"
+            ;;
+        f)
+            files_csv="$OPTARG"
+            ;;
         h)
             usage
             exit 0
@@ -172,10 +217,25 @@ while getopts ":m:r:o:f:h" opt; do
     esac
 done
 
+############################################
+# Validate -m
+############################################
+
 [[ -n "$mask_or_orientation" ]] || die "-m is required"
 
-command -v fslmaths >/dev/null 2>&1 || die "fslmaths not found in PATH"
-command -v fslstats >/dev/null 2>&1 || die "fslstats not found in PATH"
+############################################
+# Validate dependencies
+############################################
+
+command -v fslmaths >/dev/null 2>&1 || \
+    die "fslmaths not found in PATH"
+
+command -v fslstats >/dev/null 2>&1 || \
+    die "fslstats not found in PATH"
+
+############################################
+# Determine starting orientation
+############################################
 
 declare -a files_to_process=()
 
@@ -184,7 +244,7 @@ if is_valid_orientation "$mask_or_orientation"; then
     input_orientation=$(echo "$mask_or_orientation" | tr '[:lower:]' '[:upper:]')
 
     echo
-    echo "Using explicit starting orientation from -m: ${input_orientation}"
+    echo "Using explicit starting orientation: ${input_orientation}"
 
     [[ -n "$files_csv" ]] || \
         die "-f is required when -m is an explicit orientation"
@@ -204,17 +264,32 @@ else
     echo
     echo "Automatic input orientation found: ${input_orientation}"
 
+    # When -m is an image, it is also reoriented.
     files_to_process+=("$mask_or_orientation")
 
 fi
 
+############################################
+# Orientation detection only
+############################################
+
 if [[ -z "$reference_orientation" ]]; then
-    echo
-    echo "No reference orientation provided."
-    echo "Orientation detection complete."
+
+    if is_valid_orientation "$mask_or_orientation"; then
+        echo
+        echo "Starting orientation: ${input_orientation}"
+    else
+        echo
+        echo "Orientation detection complete."
+    fi
+
     echo
     exit 0
 fi
+
+############################################
+# Determine reference orientation
+############################################
 
 if [[ -f "$reference_orientation" ]]; then
 
@@ -227,7 +302,7 @@ if [[ -f "$reference_orientation" ]]; then
     output_orientation=$(predict_orientation "$ref_mask")
 
     [[ -n "$output_orientation" ]] || \
-        die "Failed to determine orientation from reference image"
+        die "Failed to determine orientation from reference image: ${reference_orientation}"
 
     echo
     echo "Automatic reference orientation found: ${output_orientation}"
@@ -237,54 +312,78 @@ else
     output_orientation=$(echo "$reference_orientation" | tr '[:lower:]' '[:upper:]')
 
     is_valid_orientation "$output_orientation" || \
-        die "Invalid reference orientation: ${output_orientation}"
+        die "Invalid reference orientation: ${reference_orientation}"
 
     echo
     echo "Using explicit reference orientation: ${output_orientation}"
 
 fi
 
-[[ -n "$output_dir" ]] || die "-o output directory is required when using -r"
+############################################
+# Validate/create output directory
+############################################
+
+[[ -n "$output_dir" ]] || \
+    die "-o output directory is required when using -r"
 
 mkdir -p "$output_dir"
 
-[[ -d "$output_dir" ]] || die "Failed to create output directory: ${output_dir}"
+[[ -d "$output_dir" ]] || \
+    die "Failed to create output directory: ${output_dir}"
+
+############################################
+# Validate transform executable
+############################################
 
 [[ -x "$transform_exec" ]] || \
     die "Transform executable missing or not executable: ${transform_exec}"
+
+############################################
+# Parse -f files
+############################################
 
 if [[ -n "$files_csv" ]]; then
 
     IFS=',' read -ra additional_files <<< "$files_csv"
 
     for f in "${additional_files[@]}"; do
-        f=$(echo "$f" | xargs)
+
+        # Trim leading/trailing whitespace
+        f="${f#"${f%%[![:space:]]*}"}"
+        f="${f%"${f##*[![:space:]]}"}"
 
         [[ -z "$f" ]] && continue
 
-        [[ -f "$f" ]] || die "File does not exist: ${f}"
+        [[ -f "$f" ]] || \
+            die "File does not exist: ${f}"
 
         files_to_process+=("$f")
+
     done
 
 fi
 
-[[ ${#files_to_process[@]} -gt 0 ]] || die "No files to reorient"
+[[ ${#files_to_process[@]} -gt 0 ]] || \
+    die "No files to reorient"
+
+############################################
+# Reorient
+############################################
 
 echo
 echo "===================================================="
 echo "Beginning reorientation"
 echo "===================================================="
+echo
+echo "Starting orientation : ${input_orientation}"
+echo "Reference orientation: ${output_orientation}"
+echo "Output directory      : ${output_dir}"
 
 for infile in "${files_to_process[@]}"; do
 
     echo
-    echo "Reorienting:"
-    echo "    ${infile}"
-    echo "FROM:"
-    echo "    ${input_orientation}"
-    echo "TO:"
-    echo "    ${output_orientation}"
+    echo "Reorienting ${infile}"
+    echo "    ${input_orientation} -> ${output_orientation}"
 
     "$transform_exec" \
         "$mcr" \
@@ -295,8 +394,7 @@ for infile in "${files_to_process[@]}"; do
 
     outfile="${output_dir}/$(basename "$infile")"
 
-    echo
-    echo "Output written to:"
+    echo "Output:"
     echo "    ${outfile}"
 
 done
@@ -304,5 +402,7 @@ done
 echo
 echo "===================================================="
 echo "Done"
+echo "Output file(s) are in:"
+echo "    ${output_dir}"
 echo "===================================================="
 echo
